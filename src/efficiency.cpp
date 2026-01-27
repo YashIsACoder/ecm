@@ -16,9 +16,11 @@ double StepEfficiency::eff(double torque, double v) const noexcept {
 	double rpm = (v == 0.0) ? 0.0 : (v * 30.0 / M_PI);
 	double ratio = (rpm == 0.0) ? 0.0 : torque/rpm;
 
-	for (size_t i{}; i < thresholds_.size(); ++i)
-		if (ratio < thresholds_[i])
+	for (size_t i{}; i < thresholds_.size(); ++i) {
+		if (ratio < thresholds_[i]) {
 			return std::max(0.99 - static_cast<double>(i) / 100.0, 0.0);
+		}
+	}
 
 	return 0.99;
 }

@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: ecm
+Version: 0.1
+Summary: Energy Consumption Model (ECM) with Python bindings
+Author: Yashwanth Madan
+Requires-Dist: pybind11>=2.10
+Dynamic: author
+Dynamic: requires-dist
+Dynamic: summary

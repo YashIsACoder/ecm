@@ -20,11 +20,12 @@ int main()
     ecm::ECM model(params, eff);
 
     double energy = model.stint(
-        1.0,   // t
         10.0,  // vi
         12.0,  // vt
-        570.0,   // S
-        30.0  // X
+	1.0,    // t
+	0.0,	// wind
+        0.0,	// slope
+        570.0 // solar input avg
     );
 
     std::cout << "Energy: " << energy << '\n';

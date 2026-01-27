@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.20)
-project(ecm LANGUAGES CXX)
+project(ECM_module LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# ---------------- C++ library ----------------
+# ---------------- Core C++ library ----------------
 add_library(ecm STATIC
     src/forces.cpp
     src/efficiency.cpp
@@ -19,9 +19,11 @@ target_include_directories(ecm
 # ---------------- Python bindings ----------------
 option(ECM_BUILD_PYTHON "Build Python bindings" ON)
 
-if (ECM_BUILD_PYTHON)
+if(ECM_BUILD_PYTHON)
+    # Find active Python
     find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 
+    # Fetch pybind11 if not installed system-wide
     include(FetchContent)
     FetchContent_Declare(
         pybind11
@@ -30,21 +32,19 @@ if (ECM_BUILD_PYTHON)
     )
     FetchContent_MakeAvailable(pybind11)
 
-    # IMPORTANT: different target name
-    pybind11_add_module(ecm_py MODULE
-        python/bindings.cpp
-    )
+    # Pybind module target
+    pybind11_add_module(ecm_py python/bindings.cpp)
 
     target_link_libraries(ecm_py
         PRIVATE
             ecm
             Python3::Python
+            pybind11::module
     )
 
-    # Make the Python module importable as `ecm`
-    set_target_properties(ecm_py PROPERTIES
-        OUTPUT_NAME ecm
-    )
+    # Rename module to 'ecm' for Python import
+    set_target_properties(ecm_py PROPERTIES OUTPUT_NAME ecm)
+endif()
 
 # ---------------- C++ Tests ----------------
 add_executable(ecm_test
@@ -56,4 +56,7 @@ target_link_libraries(ecm_test
         ecm
 )
 
-endif()
+# ---------------- Optional: install rules ----------------
+install(TARGETS ecm_py LIBRARY DESTINATION ecm_python) # optional
+install(TARGETS ecm ARCHIVE DESTINATION lib)           # optional
+

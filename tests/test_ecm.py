@@ -1,35 +1,24 @@
 import ecm
 
 def test_basic_ecm():
-    params = ecm.VehicleParams(
-        rho=1.225,
-        Cd=0.1,
-        A=1.864,
-        m=932.8,
-        g=9.81,
-        Crr=0.0105,
-        rw=0.2715
-    )
+    params = ecm.VehicleParams()
+    params.rho = 1.225
+    params.Cd = 0.1
+    params.A = 1.864
+    params.m = 932.8
+    params.g = 9.81
+    params.Crr = 0.0105
+    params.rw = 0.2715
+    params.X = 500.0
 
     eff = ecm.StepEfficiency()
     model = ecm.ECM(params, eff)
 
-    energy = model.stint(
-        t=1.0,
-        vi=10.0,
-        vt=12.0,
-        S=0.0,
-        X=500.0
-    )
-
+    energy = model.stint(10.0, 12.0, 1.0, 0.0, 0.0, 570)
     print("Energy:", energy)
-
     assert energy > 0.0
     assert energy < 1e6
-
-    print("[Python] ECM stint test passed")
-
+    print("[Python] ECM test passed")
 
 if __name__ == "__main__":
     test_basic_ecm()
-
