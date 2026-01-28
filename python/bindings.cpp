@@ -41,7 +41,7 @@ PYBIND11_MODULE(ecm, m) {
              py::arg("t"),
              py::arg("wind") = 0.0,
              py::arg("slope") = 0.0,
-             py::arg("S") 
+             py::arg("S") = 570.0 
         );
 }
 
