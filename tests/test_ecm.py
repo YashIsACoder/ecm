@@ -9,7 +9,7 @@ def test_basic_ecm():
     params.g = 9.81
     params.Crr = 0.0105
     params.rw = 0.2715
-    params.X = 500.0
+    params.X = 30.0
 
     eff = ecm.StepEfficiency()
     model = ecm.ECM(params, eff)
