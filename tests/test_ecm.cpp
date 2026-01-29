@@ -14,7 +14,7 @@ int main()
         .g   = 9.81,
         .Crr = 0.0105,
         .rw  = 0.2715,
-	.X = 30,
+	.X = 30, // added this 
     };
 
     auto eff = std::make_shared<ecm::StepEfficiency>();
