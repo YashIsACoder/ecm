@@ -1,6 +1,7 @@
 #include <pybind11/pybind11.h>
 #include <memory>
 #include "ecm/ecm.hpp"
+#include "ecm_cont/ecm_continuous.hpp"
 #include "ecm/efficiency.hpp"
 
 namespace py = pybind11;

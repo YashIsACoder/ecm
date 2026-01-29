@@ -1,0 +1,31 @@
+#pragma once
+#include <array>
+#include <functional>
+
+namespace ecm_cont {
+
+using State = std::array<double, 2>; // {v, E}
+
+inline State operator+(const State& a, const State&b) {
+	return { a[0] + b[0], a[1] + b[1] };
+}
+
+inline State operator*(double s, const State& a) {
+	return { s*a[0], s*a[1] };
+}
+
+inline State operator*(const State& a, double s) {
+	return s*a;
+}
+
+class RK4 // range kutta fourth order: numeric approx
+{
+public:
+	using RHS= std::function<State(double, const State&)>;
+
+	static State step(const RHS& f,
+			  double t,
+			  const State& x, 
+			  double dt);
+};
+}
