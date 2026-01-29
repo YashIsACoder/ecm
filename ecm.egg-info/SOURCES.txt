@@ -1,3 +1,5 @@
+LICENSE.md
+README.md
 pyproject.toml
 setup.py
 ecm.egg-info/PKG-INFO
@@ -10,4 +12,8 @@ python/bindings.cpp
 src/ecm.cpp
 src/efficiency.cpp
 src/forces.cpp
+src/ecm_cont/dynamics.cpp
+src/ecm_cont/ecm_continuous.cpp
+src/ecm_cont/integrator.cpp
+tests/test_cont.py
 tests/test_ecm.py

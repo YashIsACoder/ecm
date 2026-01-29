@@ -23,7 +23,10 @@ ecm_module = Extension(
         "python/bindings.cpp",   # pybind11 bindings
         "src/ecm.cpp",           # ECM implementation
         "src/efficiency.cpp",    # efficiency models
-        "src/forces.cpp"         # force calculations
+        "src/forces.cpp",         # force calculations
+        "src/ecm_cont/integrator.cpp", 
+        "src/ecm_cont/dynamics.cpp",
+        "src/ecm_cont/ecm_continuous.cpp",
     ],
     include_dirs=include_dirs,
     language="c++",
@@ -32,7 +35,7 @@ ecm_module = Extension(
 
 setup(
     name="ecm",
-    version="0.1",
+    version="0.1.0",
     author="Yashwanth Madan",
     description="Energy Consumption Model (ECM) with Python bindings",
     ext_modules=[ecm_module],
