@@ -59,6 +59,24 @@ int main()
 
     std::cout << "Continuous ECM energy: " << E_cont << '\n';
 
+	// ---------------- Continuous ECM (Euler) ----------------
+	ecm_cont::ECMContinuous continuous_euler(
+	    params,
+	    *eff,
+	    ecm_cont::IntegratorType::Euler
+	);
+
+	double E_cont_euler = continuous_euler.stint(
+	    vi,
+	    vt,
+	    T,
+	    wind,
+	    slope,
+	    params.X - solar
+	);
+
+	std::cout << "Continuous ECM (Euler): " << E_cont_euler << '\n';
+
     // ---------------- Sanity checks ----------------
     assert(E_discrete > 0.0);
     assert(E_cont > 0.0);
