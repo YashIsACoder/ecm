@@ -22,7 +22,7 @@ double ECMContinuous::solve_power(double vi, double vt, double T,
         double t = 0.0, dt = T / 200.0;
 
         while (t < T) {
-            x = RK4::step(dyn, t, x, dt);
+            x = step_integrator(integrator_, dyn, t, x, dt);
             t += dt;
         }
 
