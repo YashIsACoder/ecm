@@ -2,7 +2,22 @@
 
 namespace ecm_cont {
 
-// see wikipedia 
+// Euler
+State Euler::step(const RHS& f, double t, const State& x, double dt) {
+	return x + dt * f(t, x);
+}
+
+// Semi Implicit Euler
+State SemiImplicitEuler::step(const RHS& f, double t, const State& x, double dt) {
+	State dx = f(t,x);
+
+	State x_next = x;
+	x_next[0] += dt*dx[0];
+	x_next[1] += dt*dx[1];
+	return x_next;
+}
+
+// RK4
 State RK4::step(const RHS& f, double t, const State& x, double dt)
 {
     State k1 = f(t, x);

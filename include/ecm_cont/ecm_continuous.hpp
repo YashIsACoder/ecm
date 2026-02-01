@@ -1,13 +1,16 @@
 #pragma once
 #include "ecm/params.hpp"
 #include "ecm/efficiency.hpp"
+#include "ecm_cont/ecm_continuous.hpp"
+#include "ecm_cont/integrator_dispatch.hpp"
 
 namespace ecm_cont {
 
 class ECMContinuous {
 public:
     ECMContinuous(const ecm::VehicleParams& p,
-                  const ecm::EfficiencyModel& eff);
+                  const ecm::EfficiencyModel& eff,
+		  IntegratorType integrator = IntegratorType::RK4);
 
     double stint(double vi,
                  double vt,
@@ -22,6 +25,7 @@ private:
 
     ecm::VehicleParams p_;
     const ecm::EfficiencyModel& eff_;
+    IntegratorType integrator_;
 };
 
 }

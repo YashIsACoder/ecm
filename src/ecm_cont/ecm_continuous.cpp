@@ -5,8 +5,10 @@
 namespace ecm_cont {
 
 ECMContinuous::ECMContinuous(const ecm::VehicleParams& p,
-                             const ecm::EfficiencyModel& eff)
-    : p_{p}, eff_{eff} {}
+                             const ecm::EfficiencyModel& eff,
+			     IntegratorType integrator)
+    : p_{p}, eff_{eff}, integrator_{integrator}
+	{}
 
 double ECMContinuous::solve_power(double vi, double vt, double T,
                                   double wind, double slope, double aux) const
@@ -20,7 +22,7 @@ double ECMContinuous::solve_power(double vi, double vt, double T,
         double t = 0.0, dt = T / 200.0;
 
         while (t < T) {
-            x = RK4::step(dyn, t, x, dt);
+            x = step_integrator(integrator_, dyn, t, x, dt);
             t += dt;
         }
 
@@ -45,7 +47,7 @@ double ECMContinuous::stint(double vi,
 
     double t = 0.0, dt = 0.001;
     while (t < T) {
-        x = RK4::step(dyn, t, x, dt);
+        x = step_integrator(integrator_, dyn, t, x, dt);
         t += dt;
     }
 

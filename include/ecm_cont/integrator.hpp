@@ -18,14 +18,19 @@ inline State operator*(const State& a, double s) {
 	return s*a;
 }
 
-class RK4 // range kutta fourth order: numeric approx
-{
-public:
-	using RHS= std::function<State(double, const State&)>;
-
-	static State step(const RHS& f,
-			  double t,
-			  const State& x, 
-			  double dt);
+// RHS: dx/dt = f(t, x)
+using RHS = std::function<State(double, const State&)>;
+	
+struct Euler {
+	static State step(const RHS& f, double t, const State& x, double dt);
 };
+
+struct SemiImplicitEuler {
+	static State step(const RHS& f, double t, const State& x, double dt);
+};
+
+struct RK4 {
+	static State step(const RHS& f, double t, const State& x, double dt);
+};
+
 }
