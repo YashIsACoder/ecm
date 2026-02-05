@@ -12,7 +12,7 @@ public:
 	    std::shared_ptr<EfficiencyModel> eff);
 
 	double stint(double vi, double vt, double t,
-		     double wind=0.0, double slope=0.0, double S=670.0) const noexcept;
+		     double wind=0.0, double slope=0.0, double S=570.0) const noexcept;
 	
 private:
 	VehicleParams p_;

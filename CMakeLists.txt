@@ -20,9 +20,9 @@ option(ECM_BUILD_TESTS  "Build C++ tests" ON)
 # Core ECM (DISCRETE)
 # =========================
 add_library(ecm STATIC
-    src/forces.cpp
-    src/efficiency.cpp
-    src/ecm.cpp
+    src/ecm_disc/forces.cpp
+    src/ecm_disc/efficiency.cpp
+    src/ecm_disc/ecm.cpp
 )
 
 target_include_directories(ecm
