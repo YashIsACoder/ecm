@@ -16,6 +16,7 @@ minimum-version = "build-system.requires"
 cmake.version = ">=3.20"
 wheel.packages = []
 install.components = ["python"]
+build.targets = ["ecm_py"]
 
 [tool.scikit-build.cmake.define]
 ECM_BUILD_PYTHON = "ON"

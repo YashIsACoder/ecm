@@ -13,3 +13,8 @@ add_test(NAME ECM.DriveCycle COMMAND ecm_drive_cycle_test)
 add_executable(ecm_route_energy_test cpp/test_route_energy.cpp)
 target_link_libraries(ecm_route_energy_test PRIVATE ECM::ecm_cont)
 add_test(NAME ECM.RouteEnergy COMMAND ecm_route_energy_test)
+
+add_executable(ecm_lab_test cpp/test_lab.cpp)
+target_link_libraries(ecm_lab_test PRIVATE ECM::lab)
+target_compile_definitions(ecm_lab_test PRIVATE TEST_ROUTE="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/route.csv")
+add_test(NAME ECM.Lab COMMAND ecm_lab_test)

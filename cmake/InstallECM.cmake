@@ -11,7 +11,7 @@ write_basic_package_version_file(
     COMPATIBILITY SameMajorVersion
 )
 
-install(TARGETS ecm ecm_cont EXPORT ECMTargets
+install(TARGETS ecm ecm_cont ecm_lab EXPORT ECMTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT development
 )
 install(EXPORT ECMTargets

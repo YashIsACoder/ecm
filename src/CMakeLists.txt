@@ -17,7 +17,18 @@ add_library(ecm_cont STATIC
 add_library(ECM::ecm_cont ALIAS ecm_cont)
 target_link_libraries(ecm_cont PUBLIC ECM::ecm)
 
-foreach(target IN ITEMS ecm ecm_cont)
+set(default_route "${PROJECT_SOURCE_DIR}/data/routes/outback-2025-style.csv")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${default_route}")
+file(READ "${default_route}" ECM_DEFAULT_ROUTE_CSV)
+configure_file(lab/default_route.hpp.in generated/default_route.hpp @ONLY)
+
+add_library(ecm_lab STATIC lab/experiment.cpp lab/race.cpp lab/route.cpp lab/scenario.cpp)
+add_library(ECM::lab ALIAS ecm_lab)
+set_target_properties(ecm_lab PROPERTIES EXPORT_NAME lab)
+target_include_directories(ecm_lab PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+target_link_libraries(ecm_lab PUBLIC ECM::ecm_cont)
+
+foreach(target IN ITEMS ecm ecm_cont ecm_lab)
     target_include_directories(${target}
         PUBLIC
             $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>

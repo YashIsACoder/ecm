@@ -22,7 +22,7 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 
 python3 apps/route-lab/analysis/run_matrix.py build/bin/solar-race \
-  --route apps/route-lab/data/rolling-1150.csv --seed 2025 --out runs/rolling-2025
+  --route data/routes/rolling-1150.csv --seed 2025 --out runs/rolling-2025
 ```
 
 The lab writes raw trial CSVs, paired comparisons, and a manifest. Run
@@ -33,7 +33,7 @@ where available, and SR8 models a provisional battery-and-solar scenario.
 
 ## Use the library
 
-- **C++** builds against `ECM::ecm` for the core or `ECM::ecm_cont` for drive cycles and route model adapters. Both are available via `find_package(ECM 0.2 CONFIG REQUIRED)` and `add_subdirectory`. [C++ integration and examples](docs/library-guide.md)
+- **C++** exports `ECM::ecm` for the core, `ECM::ecm_cont` for drive cycles, and `ECM::lab` for routes, weather, strategy and experiments. [C++ integration and examples](docs/library-guide.md)
 - **Python** builds the same C++ targets via `python -m pip install .` and exposes them as `import ecm`. The extension supports Python 3.8 or later. [Python example](docs/library-guide.md#python)
 
 ## Design and validation

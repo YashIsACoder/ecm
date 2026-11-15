@@ -1,11 +1,11 @@
-#include "solar_race/race.hpp"
+#include "ecm/lab.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <stdexcept>
 
-using namespace solar_race;
+using namespace ecm::lab;
 
 void check(bool condition, const char* message) {
     if (!condition) {
@@ -70,4 +70,18 @@ int main() {
     const auto substituted = simulate(short_route, no_sun, flat, Policy::steady);
     near(substituted.drive_hours, 0.05, "a custom estimator controls leg duration");
     near(substituted.finish_soc, 0.75, "a custom estimator feeds the battery update");
+
+    std::mt19937_64 experiment_seed(42);
+    const auto first_draw = draw_weather(route, experiment_seed);
+    std::size_t rows = 0;
+    run_experiment(route, defaults, {2, 42}, [&](const TrialResult& trial) {
+        check(trial.trial == rows / policies.size() + 1 && trial.policy == policies[rows % policies.size()],
+              "trial numbering and policy order");
+        if (trial.trial == 1) {
+            const auto expected = simulate(route, first_draw, defaults, trial.policy);
+            near(trial.result.finish_soc, expected.finish_soc, "policies use the same weather draw");
+        }
+        ++rows;
+    });
+    check(rows == 2 * policies.size(), "experiment streams all policy outcomes");
 }

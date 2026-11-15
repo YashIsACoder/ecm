@@ -6,7 +6,7 @@
 - **Push** targets 92 km/h.
 - **Reserve-first** chooses 92 or 85 km/h if the current leg's estimated draw leaves at least 35% state of charge. Otherwise it uses 75 km/h. It observes conditions for the current leg and has no future weather. Every policy applies the leg's synthetic pace cap.
 
-A paired trial draws conditions once, then runs all three policies on that draw. This keeps differences attributable to the pacing rules within the model. The example uses independent draws across trials. Cloud and wind share a per-day random component, with smaller leg-to-leg variation. Rolling resistance gets a small independent perturbation at each leg. Route distance, grade and clear-sky irradiance come from the checked-in [synthetic fixture](../data/README.md). The weather generator is a scenario design, with no calibration to historical forecasts.
+A paired trial draws conditions once, then runs all three policies on that draw. This keeps differences attributable to the pacing rules within the model. The example uses independent draws across trials. Cloud and wind share a per-day random component, with smaller leg-to-leg variation. Rolling resistance gets a small independent perturbation at each leg. Route distance, grade and clear-sky irradiance come from the checked-in [synthetic fixture](../../../data/routes/README.md). The weather generator uses synthetic assumptions.
 
 ## Energy and storage
 

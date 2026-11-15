@@ -1,4 +1,4 @@
-#include "solar_race/race.hpp"
+#include "ecm/lab.hpp"
 
 #include <algorithm>
 #include <array>
@@ -8,7 +8,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace solar_race {
+namespace ecm::lab {
 namespace {
 
 std::vector<std::string> fields(std::string_view line) {
@@ -134,4 +134,4 @@ std::vector<Leg> read_route(std::istream& input, std::string_view source_name) {
     return route;
 }
 
-}  // namespace solar_race
+}  // namespace ecm::lab

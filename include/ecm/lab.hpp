@@ -3,6 +3,7 @@
 #include "ecm_cont/route_energy.hpp"
 
 #include <array>
+#include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <iosfwd>
@@ -12,7 +13,7 @@
 #include <string_view>
 #include <vector>
 
-namespace solar_race {
+namespace ecm::lab {
 
 struct Leg {
     int day;
@@ -65,10 +66,29 @@ struct Result {
     double spilled_wh = 0.0;
 };
 
+struct Experiment {
+    std::uint64_t trials = 2000;
+    std::uint64_t seed = 2025;
+};
+
+struct TrialResult {
+    std::uint64_t trial;  // One-based, shared by all policies on a weather draw.
+    Policy policy;
+    Result result;
+};
+
+using TrialSink = std::function<void(const TrialResult&)>;
+
+[[nodiscard]] std::vector<Leg> default_route();
 [[nodiscard]] std::vector<Leg> read_route(const std::filesystem::path& path);
 [[nodiscard]] std::vector<Leg> read_route(std::istream& csv, std::string_view source_name);
 [[nodiscard]] std::vector<Weather> draw_weather(std::span<const Leg> route, std::mt19937_64& random);
 [[nodiscard]] Result simulate(std::span<const Leg> route, std::span<const Weather> weather,
                               const Config& config, Policy policy);
 
-}  // namespace solar_race
+// Calls the sink synchronously for each result in trial and policy order.
+// Exceptions from the model or sink stop the experiment and propagate.
+void run_experiment(std::span<const Leg> route, const Config& config,
+                    Experiment experiment, const TrialSink& sink);
+
+}  // namespace ecm::lab

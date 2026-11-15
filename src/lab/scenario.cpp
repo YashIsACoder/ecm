@@ -1,8 +1,8 @@
-#include "solar_race/race.hpp"
+#include "ecm/lab.hpp"
 
 #include <stdexcept>
 
-namespace solar_race {
+namespace ecm::lab {
 
 Config vehicle_config(std::string_view name) {
     Config config;
@@ -56,4 +56,4 @@ RouteEnergyModel route_energy_model(std::string_view name) {
     throw std::invalid_argument("unknown ECM model " + std::string(name) + "; use segment, cycle or mapped");
 }
 
-}  // namespace solar_race
+}  // namespace ecm::lab

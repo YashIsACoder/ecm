@@ -12,7 +12,7 @@ def main() -> None:
         subprocess.run(
             [
                 sys.executable, str(tests.parent / "analysis" / "run_matrix.py"), sys.argv[1],
-                "--route", str(tests / "route.csv"), "--trials", "3", "--seed", "42", "--out", str(output),
+                "--route", sys.argv[2], "--trials", "3", "--seed", "42", "--out", str(output),
             ],
             check=True,
         )

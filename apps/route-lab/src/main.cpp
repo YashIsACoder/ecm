@@ -1,5 +1,4 @@
-#include "solar_race/race.hpp"
-#include "default_route.hpp"
+#include "ecm/lab.hpp"
 
 #include <charconv>
 #include <cmath>
@@ -7,7 +6,6 @@
 #include <iomanip>
 #include <iostream>
 #include <optional>
-#include <sstream>
 #include <stdexcept>
 #include <string_view>
 
@@ -45,8 +43,7 @@ double pack_wh(std::string_view input) {
 int main(int argc, char** argv) {
     try {
         std::optional<std::filesystem::path> route_path;
-        std::uint64_t trials = 2000;
-        std::uint64_t seed = 2025;
+        ecm::lab::Experiment experiment;
         std::string_view vehicle = "reference";
         std::string_view model = "segment";
         std::optional<double> capacity;
@@ -67,7 +64,7 @@ int main(int argc, char** argv) {
             if (option == "--route") {
                 route_path = value;
             } else if (option == "--trials") {
-                trials = unsigned_value(value);
+                experiment.trials = unsigned_value(value);
             } else if (option == "--pack-kwh") {
                 capacity = pack_wh(value);
             } else if (option == "--vehicle") {
@@ -75,36 +72,26 @@ int main(int argc, char** argv) {
             } else if (option == "--model") {
                 model = value;
             } else {
-                seed = unsigned_value(value);
+                experiment.seed = unsigned_value(value);
             }
         }
-        if (trials == 0) {
+        if (experiment.trials == 0) {
             throw std::invalid_argument("at least one trial is required");
         }
 
-        auto config = solar_race::vehicle_config(vehicle);
-        config.energy_model = solar_race::route_energy_model(model);
+        auto config = ecm::lab::vehicle_config(vehicle);
+        config.energy_model = ecm::lab::route_energy_model(model);
         config.capacity_wh = capacity.value_or(config.capacity_wh);
-        const auto route = [&] {
-            if (route_path) {
-                return solar_race::read_route(*route_path);
-            }
-            std::istringstream csv(solar_race::default_route_csv);
-            return solar_race::read_route(csv, "built-in outback route");
-        }();
-        std::mt19937_64 random(seed);
+        const auto route = route_path ? ecm::lab::read_route(*route_path) : ecm::lab::default_route();
         std::cout << "trial,policy,completed,reserve_breached,distance_km,drive_hours,finish_soc_pct,min_soc_pct,"
                      "demand_kwh,solar_kwh,spilled_kwh\n" << std::fixed << std::setprecision(6);
-        for (std::uint64_t trial = 0; trial < trials; ++trial) {
-            const auto weather = solar_race::draw_weather(route, random);
-            for (const auto policy : solar_race::policies) {
-                const auto result = solar_race::simulate(route, weather, config, policy);
-                std::cout << trial + 1 << ',' << solar_race::policy_name(policy) << ',' << result.completed << ','
-                    << result.reserve_breached << ',' << result.distance_km << ',' << result.drive_hours << ','
-                    << 100.0 * result.finish_soc << ',' << 100.0 * result.min_soc << ',' << result.demand_wh / 1000.0
-                    << ',' << result.solar_wh / 1000.0 << ',' << result.spilled_wh / 1000.0 << '\n';
-            }
-        }
+        ecm::lab::run_experiment(route, config, experiment, [](const ecm::lab::TrialResult& trial) {
+            const auto& result = trial.result;
+            std::cout << trial.trial << ',' << ecm::lab::policy_name(trial.policy) << ',' << result.completed << ','
+                << result.reserve_breached << ',' << result.distance_km << ',' << result.drive_hours << ','
+                << 100.0 * result.finish_soc << ',' << 100.0 * result.min_soc << ',' << result.demand_wh / 1000.0
+                << ',' << result.solar_wh / 1000.0 << ',' << result.spilled_wh / 1000.0 << '\n';
+        });
         if (!std::cout.flush()) {
             throw std::runtime_error("failed to write trial results");
         }

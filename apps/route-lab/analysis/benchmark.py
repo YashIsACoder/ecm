@@ -13,7 +13,7 @@ def main() -> None:
     args = parser.parse_args()
     executables = [path.resolve() for path in args.executables]
 
-    route = Path(__file__).resolve().parents[1] / "data" / "outback-2025-style.csv"
+    route = Path(__file__).resolve().parents[3] / "data" / "routes" / "outback-2025-style.csv"
     trials = 100_000
     command_args = ["--route", str(route), "--trials", str(trials), "--seed", "2025"]
     timings = {executable: [] for executable in executables}

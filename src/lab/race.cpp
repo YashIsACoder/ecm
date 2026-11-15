@@ -1,10 +1,10 @@
-#include "solar_race/race.hpp"
+#include "ecm/lab.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
-namespace solar_race {
+namespace ecm::lab {
 namespace {
 
 struct PacedLeg {
@@ -150,4 +150,4 @@ Result simulate(std::span<const Leg> route, std::span<const Weather> weather, co
     return result;
 }
 
-}  // namespace solar_race
+}  // namespace ecm::lab

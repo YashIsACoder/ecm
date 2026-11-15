@@ -12,7 +12,7 @@ cmake --install build-sdk --prefix "$PWD/build-sdk/install"
 ```
 
 In your project, add the install prefix to `CMAKE_PREFIX_PATH`, then link
-the component you use. Both targets require C++20.
+the component you use. All targets require C++20.
 
 ```cmake
 find_package(ECM 0.2 CONFIG REQUIRED)
@@ -34,6 +34,23 @@ const double draw_wh = result.net_wh();
 ```
 
 [Model choices and units](route-models.md) · [Installed-package example](../tests/consumer)
+
+### Run Monte Carlo from C++
+
+Link `ECM::lab` and use `<ecm/lab.hpp>`. The library supplies the built-in
+route, vehicle presets, paired weather draws, policy evaluation, and battery
+accounting. It calls your result sink once per policy and trial.
+
+```cpp
+const auto route = ecm::lab::default_route();
+auto config = ecm::lab::vehicle_config("sr7");
+config.energy_model = ecm::lab::route_energy_model("mapped");
+
+std::size_t steady_finishes = 0;
+ecm::lab::run_experiment(route, config, {500, 2025}, [&](const ecm::lab::TrialResult& row) {
+    steady_finishes += row.policy == ecm::lab::Policy::steady && row.result.completed;
+});
+```
 
 ## Python
 

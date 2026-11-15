@@ -19,7 +19,7 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 
 python3 apps/route-lab/analysis/run_matrix.py build/bin/solar-race \
-  --route apps/route-lab/data/rolling-1150.csv --trials 2000 --seed 2025 \
+  --route data/routes/rolling-1150.csv --trials 2000 --seed 2025 \
   --out runs/rolling-2025
 ```
 
@@ -32,13 +32,13 @@ For one scenario, use the simulator directly.
 ```sh
 mkdir -p runs
 build/bin/solar-race --vehicle sr7 --model mapped \
-  --route apps/route-lab/data/outback-2025-style.csv --trials 2000 --seed 2025 > runs/sr7.csv
+  --route data/routes/outback-2025-style.csv --trials 2000 --seed 2025 > runs/sr7.csv
 python3 apps/route-lab/analysis/analyse.py runs/sr7.csv
 ```
 
 The binary embeds the default outback fixture, so it runs from any working
 directory without a `--route` argument. Supply `--route PATH` for your own
-[route CSV](data/README.md).
+[route CSV](../../data/routes/README.md).
 
 ## ECM backends
 

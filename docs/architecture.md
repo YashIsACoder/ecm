@@ -24,13 +24,14 @@ flowchart LR
 | `include/ecm_cont`, `src/continuous` | Continuous drive cycles, integration, and route estimator adapters |
 | `src/detail` | Shared internal validation and unit conventions |
 | `bindings/python` | pybind11 bindings for the C++ library |
-| `apps/route-lab` | CLI, scenario presets, route parser, Monte Carlo engine, and Python analysis |
+| `include/ecm/lab.hpp`, `src/lab` | Reusable route parser, scenario presets, policy engine, and paired Monte Carlo driver |
+| `apps/route-lab` | Command-line client and Python analysis |
 | `tests` | Native model tests, Python binding tests, and an installed-package consumer |
 
 `ECM::ecm_cont` links `ECM::ecm`. The bindings and the lab both use the
-library, so force and energy calculations live in one place. The lab's
-internal C++ target and its Python scripts sit outside the public library
-API. Native and wheel builds use the same CMake targets. Native installation
+library, so force and energy calculations live in one place. `ECM::lab`
+adds seeded weather and a streaming result sink on top of the estimators.
+Native and wheel builds use the same CMake targets. Native installation
 exports the headers and CMake targets, and the wheel ships the extension
 plus package metadata.
 
@@ -57,8 +58,8 @@ across toolchains.
 ## Extension points
 
 - Write an estimator with the `RouteEnergyModel` signature and pass it to the lab through `Config::energy_model`. Keep vehicle parameters and inferred battery state separate.
-- Add a vehicle scenario in `apps/route-lab/src/scenario.cpp` and document which inputs are measured, published or assumed.
-- Add a policy in `apps/route-lab/src/race.cpp`. Keep the CSV policy names and the analysis reader in sync.
+- Add a vehicle scenario in `src/lab/scenario.cpp` and document which inputs are measured, published or assumed.
+- Add a policy in `src/lab/race.cpp`. Keep the CSV policy names and the analysis reader in sync.
 
 Battery charge and depletion currently use a leg-average power estimate.
 Tests cover route parsing, the common estimator contract, energy conservation,
