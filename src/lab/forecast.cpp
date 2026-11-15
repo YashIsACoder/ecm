@@ -142,4 +142,28 @@ std::vector<Weather> draw_forecast_weather(std::span<const Leg> route, const For
     return result;
 }
 
+void draw_rain(std::span<const Leg> route, std::span<Weather> weather, double multiplier,
+               std::mt19937_64& random) {
+    if (route.size() != weather.size() || !(multiplier >= 0.0 && multiplier <= 2.0)) {
+        throw std::invalid_argument("rain needs matching legs and a multiplier from 0 to 2");
+    }
+    std::normal_distribution<double> normal;
+    constexpr double persistence = .72;
+    const double innovation = std::sqrt(1.0 - persistence * persistence);
+    double front = multiplier > 0.0 ? normal(random) : 0.0;
+    double wetness = 0.0;
+    for (std::size_t i = 0; i < route.size(); ++i) {
+        auto& leg_weather = weather[i];
+        if (multiplier > 0.0) front = persistence * front + innovation * normal(random);
+        const double moisture = front + 2.2 * (.75 - leg_weather.solar_factor) - .60;
+        const double rain = std::clamp(7.5 * multiplier * moisture, 0.0, 40.0);
+        const double equilibrium = rain / (4.0 + rain);
+        const double response_km = rain > 0.0 ? 35.0 : 115.0;
+        const double previous = wetness;
+        wetness += (equilibrium - wetness) * -std::expm1(-route[i].distance_km / response_km);
+        leg_weather.rain_mm_h = rain;
+        leg_weather.road_wetness = (previous + wetness) / 2.0;
+    }
+}
+
 }  // namespace ecm::lab

@@ -97,6 +97,19 @@ int main() {
 
     check(stress.completed, "weather-adjusted run reaches the finish");
 
+    auto wet = calm;
+    wet[0].rain_mm_h = 10.0;
+    wet[0].road_wetness = .5;
+    planning.weather_adjustments = {};
+    const auto wet_run = simulate(planning_route, wet, planning, Policy::push, [](const LegObservation& leg) {
+        if (leg.leg != 0) return;
+        near(leg.effective_pace_cap_kmh, 93.0, "wet roads reduce the route pace cap");
+        near(leg.cruise_kmh, 93.0, "configured speed respects the wet pace cap");
+        near(leg.weather.rolling_multiplier, 1.07, "wet roads increase rolling losses");
+        near(leg.weather.solar_factor, .5 * (1.0 - .35 * 10.0 / 15.0), "rain reduces usable sunlight");
+    });
+    check(!wet_run.completed, "wet run uses the same depletion rules");
+
     const auto residuals = synthetic_weather_residuals();
     const auto forecast = calibrate_forecast(residuals, 2025);
     const auto rerun = calibrate_forecast(residuals, 2025);
@@ -124,6 +137,24 @@ int main() {
         check(conditions.solar_factor >= .25 && conditions.solar_factor <= 1.0 &&
               std::isfinite(conditions.headwind_mps), "forecast stays within physical input bounds");
     }
+
+    const auto long_route = default_route();
+    std::mt19937_64 wet_rng(91), wet_repeat(91);
+    auto generated = draw_forecast_weather(long_route, forecast, weather_random);
+    auto generated_again = generated;
+    const double original_sun = generated.front().solar_factor;
+    draw_rain(long_route, generated, 1.0, wet_rng);
+    draw_rain(long_route, generated_again, 1.0, wet_repeat);
+    near(generated.front().solar_factor, original_sun, "rain preserves the underlying sampled forecast");
+    bool shower = false, drying = false;
+    for (std::size_t i = 0; i < generated.size(); ++i) {
+        const auto& conditions = generated[i];
+        near(conditions.rain_mm_h, generated_again[i].rain_mm_h, "rain is replayable with the same seed");
+        check(conditions.road_wetness >= 0.0 && conditions.road_wetness <= 1.0, "wetness stays bounded");
+        shower |= conditions.rain_mm_h > 0.0;
+        drying |= conditions.rain_mm_h == 0.0 && conditions.road_wetness > 0.0;
+    }
+    check(shower && drying, "roads retain moisture after a shower");
 
     const std::array short_route{Leg{1, "Finish", 10.0, 0.0, 0.0, 40.0}};
     const std::array no_sun{Weather{0.0, 0.0, 1.0, 0.0}};

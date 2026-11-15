@@ -35,7 +35,7 @@ void help(std::ostream& output) {
         << "Pacing: --steady-kmh N --push-kmh N --reserve-strategy tiers|envelope\n"
         << "        --reserve-fast-kmh N --reserve-medium-kmh N --reserve-slow-kmh N --reserve-target-pct N\n"
         << "Solar:  --array-m2 N --cell-efficiency-pct N --system-efficiency-pct N --parked-wh-m2 N\n"
-        << "Weather stress test: --solar-multiplier N --headwind-offset-mps N\n"
+        << "Weather stress test: --solar-multiplier N --headwind-offset-mps N --rain-multiplier N\n"
         << "--pack-kwh overrides the selected vehicle's usable capacity.\n";
 }
 
@@ -168,6 +168,8 @@ int main(int argc, char** argv) {
                 parked_exposure = number(value, option, 0, 10000);
             } else if (option == "--solar-multiplier") {
                 weather_adjustments.solar_multiplier = number(value, option, 0, 2);
+            } else if (option == "--rain-multiplier") {
+                experiment.rain_multiplier = number(value, option, 0, 2);
             } else if (option == "--headwind-offset-mps") {
                 weather_adjustments.headwind_offset_mps = number(value, option, -25, 25);
             } else {
@@ -202,7 +204,7 @@ int main(int argc, char** argv) {
                          "solar_wh,demand_wh,parked_wh,depleted,elapsed_hours,depart_soc_pct,spilled_wh,"
                          "irradiance_w_m2,drag_wh,rolling_wh,climb_wh,kinetic_wh,traction_wh,auxiliary_wh,"
                          "recovered_wh,race_depart_hours,race_arrive_hours,control_hours,overnight_hours,"
-                         "mean_speed_kmh,planned_arrival_soc_pct\n"
+                         "mean_speed_kmh,planned_arrival_soc_pct,rain_mm_h,road_wetness,effective_pace_cap_kmh\n"
                       << std::fixed << std::setprecision(6);
             trace = {*traced_trial, [](ecm::lab::Policy policy, const ecm::lab::LegObservation& leg) {
                 std::cerr << ecm::lab::policy_name(policy) << ',' << leg.leg << ',' << leg.distance_km << ','
@@ -221,7 +223,8 @@ int main(int argc, char** argv) {
                 std::cerr << ',' << leg.race_depart_hours << ',' << leg.race_arrive_hours << ',' << leg.control_hours
                     << ',' << leg.overnight_hours << ',' << leg.mean_speed_kmh << ',';
                 if (leg.planned_arrival_soc) std::cerr << 100.0 * *leg.planned_arrival_soc;
-                std::cerr << '\n';
+                std::cerr << ',' << leg.weather.rain_mm_h << ',' << leg.weather.road_wetness
+                    << ',' << leg.effective_pace_cap_kmh << '\n';
             }};
         }
         std::cout << "trial,policy,completed,reserve_breached,distance_km,drive_hours,finish_soc_pct,min_soc_pct,"

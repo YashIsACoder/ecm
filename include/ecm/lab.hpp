@@ -32,6 +32,8 @@ struct Weather {
     double headwind_mps;
     double rolling_multiplier;
     double park_solar_factor;
+    double rain_mm_h = 0.0;
+    double road_wetness = 0.0;  // Dimensionless fraction, including residual wetness after rain.
 };
 
 using RouteEnergyModel = std::function<ecm_cont::RouteEnergy(
@@ -96,6 +98,7 @@ struct Experiment {
     std::uint64_t trials = 2000;
     std::uint64_t seed = 2025;
     WeatherModel weather = WeatherModel::baseline;
+    double rain_multiplier = 0.0;  // Synthetic showers, from 0 (disabled) to 2.
 };
 
 struct TrialResult {
@@ -127,6 +130,7 @@ struct LegObservation {
     double overnight_hours;
     double mean_speed_kmh = 0.0;  // Distance over simulated driving time, including ramps.
     std::optional<double> planned_arrival_soc;  // Envelope target, possibly above capacity.
+    double effective_pace_cap_kmh = 0.0;
 };
 
 using LegSink = std::function<void(const LegObservation&)>;

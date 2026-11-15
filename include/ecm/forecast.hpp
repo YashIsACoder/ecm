@@ -31,4 +31,8 @@ struct ForecastCalibration {
 [[nodiscard]] std::vector<Weather> draw_forecast_weather(
     std::span<const Leg> route, const ForecastCalibration& calibration, std::mt19937_64& random);
 
+// Apply seeded showers and carry wetness across legs. Does not change the dry weather fields.
+void draw_rain(std::span<const Leg> route, std::span<Weather> weather, double multiplier,
+               std::mt19937_64& random);
+
 }  // namespace ecm::lab

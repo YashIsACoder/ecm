@@ -41,7 +41,15 @@ Weather adjusted_weather(Weather weather, const WeatherAdjustments& adjustment) 
         weather.solar_factor = std::min(weather.solar_factor * adjustment.solar_multiplier, 1.0);
         weather.park_solar_factor = std::min(weather.park_solar_factor * adjustment.solar_multiplier, 1.0);
     }
+    if (!std::isfinite(weather.rain_mm_h) || weather.rain_mm_h < 0.0 ||
+        !(weather.road_wetness >= 0.0 && weather.road_wetness <= 1.0)) {
+        throw std::invalid_argument("rain must be nonnegative and road wetness must be a fraction");
+    }
     weather.headwind_mps += adjustment.headwind_offset_mps;
+    const double rain_transmission = 1.0 - .35 * (weather.rain_mm_h / (5.0 + weather.rain_mm_h));
+    weather.solar_factor *= rain_transmission;
+    weather.park_solar_factor *= rain_transmission;
+    weather.rolling_multiplier *= 1.0 + .14 * weather.road_wetness;
     return weather;
 }
 
@@ -61,10 +69,10 @@ std::array<double, 9> pace_grid(const StrategyConfig& strategy, double cap) {
 }
 
 PacedLeg pace_leg(const Config& config, const Leg& leg, const Weather& weather,
-                  Policy policy, double stored_wh, double entry_kmh, bool end_of_day,
+                  Policy policy, double stored_wh, double entry_kmh, bool end_of_day, double pace_cap,
                   std::optional<double> arrival_target) {
     const auto evaluate = [&](double target_kmh) {
-        const double speed = std::min(target_kmh, leg.pace_cap_kmh);
+        const double speed = std::min(target_kmh, pace_cap);
         return PacedLeg{speed, leg_energy(config, leg, weather, entry_kmh, speed, end_of_day)};
     };
     const auto& strategy = config.strategy;
@@ -75,7 +83,7 @@ PacedLeg pace_leg(const Config& config, const Leg& leg, const Weather& weather,
         return evaluate(strategy.push_kmh);
     case Policy::reserve_first: {
         if (arrival_target) {
-            const auto speeds = pace_grid(strategy, leg.pace_cap_kmh);
+            const auto speeds = pace_grid(strategy, pace_cap);
             auto best = evaluate(speeds.front());
             if (speeds.front() == speeds.back() ||
                 std::min(config.capacity_wh, stored_wh - best.energy.net_wh()) >= *arrival_target) return best;
@@ -245,7 +253,9 @@ Result detail::simulate_prepared(std::span<const Leg> route, std::span<const Wea
         const double race_depart = result.race_hours;
         const auto target = policy == Policy::reserve_first && !arrival_targets.empty()
             ? std::optional{arrival_targets[index]} : std::nullopt;
-        const auto [speed, energy] = pace_leg(config, leg, conditions, policy, stored_wh, entry_kmh, stop_at_end, target);
+        const double pace_cap = leg.pace_cap_kmh * (1.0 - .14 * conditions.road_wetness);
+        const auto [speed, energy] =
+            pace_leg(config, leg, conditions, policy, stored_wh, entry_kmh, stop_at_end, pace_cap, target);
         const bool depleted = energy.net_wh() > stored_wh;
         // With constant average net draw within a leg, range until depletion is linear.
         const double portion = depleted ? stored_wh / energy.net_wh() : 1.0;
@@ -275,7 +285,7 @@ Result detail::simulate_prepared(std::span<const Leg> route, std::span<const Wea
                    leg.clear_sky_w_m2 * conditions.solar_factor, components,
                    race_depart, race_arrive, control, off_duty,
                    portion > 0.0 ? leg.distance_km / (energy.seconds / 3600.0) : 0.0,
-                   target ? std::optional{*target / config.capacity_wh} : std::nullopt});
+                   target ? std::optional{*target / config.capacity_wh} : std::nullopt, pace_cap});
         }
         if (depleted) {
             result.completed = false;
