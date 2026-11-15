@@ -66,6 +66,8 @@ speed ramps from 0 to 8 m/s over 8 seconds. Recovery clips at 96 W between
 2 and 6 m/s, and propulsion starts at `√52` m/s. Integrating across
 those boundaries gives **−503 J** of signed DC traction energy.
 
+![Wheel and DC traction power during the synthetic braking interval, with the recovery cap highlighted](drive-cycle-power.png)
+
 The C++ result agreed with that closed form within `5.6 × 10⁻¹⁷ Wh` on
 Apple Clang 17. A separate fixed-step midpoint calculation converges as
 the sampling grid is refined.
@@ -81,6 +83,14 @@ the sampling grid is refined.
 ```sh
 python -m pip install .
 python examples/validate_drive_cycle.py
+```
+
+To redraw the power trace with base R, export the independent reference
+curve first.
+
+```sh
+python examples/validate_drive_cycle.py --power-csv /tmp/ecm-drive-cycle.csv
+Rscript --vanilla examples/plot_drive_cycle.R /tmp/ecm-drive-cycle.csv docs/drive-cycle-power.png
 ```
 
 This is a prescribed-speed energy model with fixed drivetrain efficiencies.
