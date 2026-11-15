@@ -1,24 +1,54 @@
 #include "solar_race/race.hpp"
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <fstream>
-#include <sstream>
+#include <limits>
 #include <stdexcept>
 #include <utility>
 
 namespace solar_race {
 namespace {
 
-std::vector<std::string> fields(const std::string& line) {
+std::vector<std::string> fields(std::string_view line) {
     std::vector<std::string> values;
-    std::istringstream input(line);
-    for (std::string value; std::getline(input, value, ',');) {
+    std::size_t cursor = 0;
+    while (true) {
+        std::string value;
+        if (cursor < line.size() && line[cursor] == '"') {
+            ++cursor;
+            while (true) {
+                const auto quote = line.find('"', cursor);
+                if (quote == std::string_view::npos) {
+                    throw std::runtime_error("unterminated quoted CSV field");
+                }
+                value.append(line.substr(cursor, quote - cursor));
+                cursor = quote + 1;
+                if (cursor == line.size() || line[cursor] != '"') {
+                    break;
+                }
+                value.push_back('"');
+                ++cursor;
+            }
+            if (cursor < line.size() && line[cursor] != ',') {
+                throw std::runtime_error("expected a comma after a quoted CSV field");
+            }
+        } else {
+            const auto end = std::min(line.find(',', cursor), line.size());
+            const auto field = line.substr(cursor, end - cursor);
+            if (field.find('"') != std::string_view::npos) {
+                throw std::runtime_error("unexpected quote in unquoted CSV field");
+            }
+            value = field;
+            cursor = end;
+        }
         values.push_back(std::move(value));
+        if (cursor == line.size()) {
+            return values;
+        }
+        ++cursor;
     }
-    if (line.ends_with(',')) {
-        values.emplace_back();
-    }
-    return values;
 }
 
 double number(const std::string& value) {
@@ -39,19 +69,31 @@ void trim_cr(std::string& line) {
 }  // namespace
 
 std::vector<Leg> read_route(const std::filesystem::path& path) {
-    std::ifstream input(path);
+    std::ifstream input(path, std::ios::binary);
     if (!input) {
         throw std::runtime_error("cannot open route " + path.string());
     }
     std::string line;
-    std::getline(input, line);
-    trim_cr(line);
-    if (line != "day,destination,distance_km,grade_pct,clear_sky_w_m2,pace_cap_kmh") {
-        throw std::runtime_error("unexpected route CSV header in " + path.string());
+    constexpr std::array<std::string_view, 6> columns{
+        "day", "destination", "distance_km", "grade_pct", "clear_sky_w_m2", "pace_cap_kmh",
+    };
+    try {
+        std::getline(input, line);
+        trim_cr(line);
+        std::string_view header(line);
+        constexpr std::string_view utf8_bom = "\xEF\xBB\xBF";
+        if (header.starts_with(utf8_bom)) {
+            header.remove_prefix(utf8_bom.size());
+        }
+        if (!std::ranges::equal(fields(header), columns)) {
+            throw std::runtime_error("unexpected route CSV header");
+        }
+    } catch (const std::runtime_error& error) {
+        throw std::runtime_error(path.string() + ":1: " + error.what());
     }
 
     std::vector<Leg> route;
-    int line_number = 1;
+    std::size_t line_number = 1;
     while (std::getline(input, line)) {
         ++line_number;
         trim_cr(line);
@@ -65,7 +107,8 @@ std::vector<Leg> read_route(const std::filesystem::path& path) {
             }
             const double day = number(values[0]);
             const int previous_day = route.empty() ? 0 : route.back().day;
-            if ((route.empty() && day != 1.0) || day < previous_day || day > previous_day + 1 ||
+            if ((route.empty() && day != 1.0) || day < previous_day || day > previous_day + 1.0 ||
+                day > std::numeric_limits<int>::max() ||
                 std::trunc(day) != day) {
                 throw std::runtime_error("days must start at 1 and be consecutive");
             }

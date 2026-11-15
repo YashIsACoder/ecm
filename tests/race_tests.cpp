@@ -19,8 +19,8 @@ void near(double actual, double expected, const char* message) {
 
 int main() {
     const auto route = read_route(TEST_ROUTE);
-    check(route.size() == 3 && route.back().day == 2 && route[1].destination == "Example roadhouse",
-          "CSV loads contiguous days and names");
+    check(route.size() == 3 && route.back().day == 2 && route[1].destination == "Example, \"roadhouse\"",
+          "CSV decodes quoted destinations and contiguous days");
 
     std::mt19937_64 first(35);
     std::mt19937_64 second(35);
