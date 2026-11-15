@@ -6,9 +6,9 @@ route parsing, computation and CSV formatting, with output sent to the null
 device. It excludes saving the CSV and running the Python analysis.
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DECM_BUILD_PYTHON=OFF
 cmake --build build --parallel
-python3 analysis/benchmark.py build/solar-race
+python3 apps/route-lab/analysis/benchmark.py build/bin/solar-race
 ```
 
 Pass two executables to compare builds. The harness warms up each binary once,

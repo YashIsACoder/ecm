@@ -1,7 +1,7 @@
 # Sunswift route lab
 
 Compare pacing policies and energy models on the same simulated weather.
-The C++ lab handles routes, weather and battery accounting. [ECM](https://github.com/YashIsACoder/ecm/tree/interchangeable-route-models)
+The C++ lab handles routes, weather and battery accounting. [ECM](../../docs/route-models.md)
 estimates driving energy. Python runs experiments and analyses paired results.
 
 I adapted this lab from my Sunswift Racing race-strategy work. The supplied
@@ -10,17 +10,16 @@ and SR8 is a battery-and-solar scenario. [Vehicle inputs and example results](do
 
 ## Run
 
-Place a checkout of private ECM 0.2 beside this repository or set
-`ECM_SOURCE_DIR` to its path. An installed ECM package also works via
-`CMAKE_PREFIX_PATH`.
+Run these commands from the ECM repository root. The lab is part of the
+native CMake build and links directly against the C++ library.
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DECM_BUILD_PYTHON=OFF
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 
-python3 analysis/run_matrix.py build/solar-race \
-  --route data/rolling-1150.csv --trials 2000 --seed 2025 \
+python3 apps/route-lab/analysis/run_matrix.py build/bin/solar-race \
+  --route apps/route-lab/data/rolling-1150.csv --trials 2000 --seed 2025 \
   --out runs/rolling-2025
 ```
 
@@ -32,10 +31,14 @@ For one scenario, use the simulator directly.
 
 ```sh
 mkdir -p runs
-./build/solar-race --vehicle sr7 --model mapped \
-  --route data/outback-2025-style.csv --trials 2000 --seed 2025 > runs/sr7.csv
-python3 analysis/analyse.py runs/sr7.csv
+build/bin/solar-race --vehicle sr7 --model mapped \
+  --route apps/route-lab/data/outback-2025-style.csv --trials 2000 --seed 2025 > runs/sr7.csv
+python3 apps/route-lab/analysis/analyse.py runs/sr7.csv
 ```
+
+The binary embeds the default outback fixture, so it runs from any working
+directory without a `--route` argument. Supply `--route PATH` for your own
+[route CSV](data/README.md).
 
 ## ECM backends
 
@@ -50,5 +53,4 @@ Every backend returns duration, DC demand and solar generation.
 [model and experiment notes](docs/model.md), [benchmark](docs/benchmark.md),
 and [reference outback experiment](docs/outback-results.md).
 
-GitHub Actions pins ECM and uses the `ECM_READ_TOKEN` repository secret
-to read that private dependency.
+The [system design](../../docs/architecture.md) shows how the lab fits into ECM.

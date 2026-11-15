@@ -1,205 +1,46 @@
-# ECM — Energy Consumption Model
+# ECM · Energy Consumption Model
 
-**ECM** is a lightweight, flexible, and portable C++ Energy Consumption Model library with Python bindings via pybind11. It allows users to simulate energy consumption for vehicles based on velocity, forces, and efficiency models.
+C++20 energy modelling for solar-electric vehicles, with a Monte Carlo route
+lab adapted from Sunswift Racing strategy work. ECM estimates energy for a
+road segment or continuous speed trace. The lab uses those estimates to compare
+pacing and battery outcomes under the same simulated weather.
 
-The library is suitable for **simulations, testing, and research**, and can be pip-installed for Python use.
+| Model | Calculation |
+| --- | --- |
+| Segment | Cruise at a fixed speed with a lumped kinetic-energy change |
+| Drive cycle | Integrate explicit speed ramps and regenerative power limits |
+| Mapped cycle | Interpolate motoring efficiency using wheel speed and torque |
 
----
+## Run the route lab
 
-## Features
-
-* **C++ core** for high-performance simulations
-* **Python bindings** via pybind11 (`import ecm`)
-* Continuous drive-cycle energy with speed ramps, signed wind, and regenerative power limits
-* Flexible **efficiency models** (e.g., stepwise efficiency)
-* Discrete **stint-based energy calculations**
-* Easy **vehicle parameter customization**
-* Pip-installable on **macOS, Linux, Windows**
-
----
-
-## Installation
-
-**Requirements:**
-
-* Python 3.8+
-* C++20 compatible compiler
-* `pybind11` (automatically handled via pip)
-
-**Install via pip (from source):**
-
-```bash
-git clone git@github.com:YashIsACoder/ecm.git
-cd ecm
-pip install .
-```
-
-> This will build the C++ library and Python module automatically.
-
----
-
-## Usage (Python)
-
-```python
-import ecm
-
-# Define vehicle parameters
-params = ecm.VehicleParams()
-params.rho = 1.225
-params.Cd = 0.1
-params.A = 1.864
-params.m = 932.8
-params.g = 9.81
-params.Crr = 0.0105
-params.rw = 0.2715
-params.X = 500.0  # auxiliary power
-
-# Choose efficiency model
-eff = ecm.StepEfficiency()
-
-# Create ECM model
-model = ecm.ECM(params, eff)
-
-# Compute energy consumed in a stint
-energy = model.stint(
-    vi=10.0,  # initial velocity (m/s)
-    vt=12.0,  # target velocity (m/s)
-    t=1.0,    # time period (s)
-    wind=0.0, # wind speed (m/s)
-    slope=0.0,# grade as rise divided by horizontal run
-    S=570     # solar power (W)
-)
-
-print("Energy consumed:", energy)
-```
-
----
-
-## C++ Usage
-
-For a dependency-free C++ build:
+From the repository root, use CMake 3.20 or later and a C++20 compiler.
+Python 3.9 or later runs the analysis scripts.
 
 ```sh
-cmake -S . -B build -DECM_BUILD_PYTHON=OFF -DCMAKE_BUILD_TYPE=Debug
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DECM_BUILD_PYTHON=OFF
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
-cmake --install build --prefix "$PWD/build/install"
+
+python3 apps/route-lab/analysis/run_matrix.py build/bin/solar-race \
+  --route apps/route-lab/data/rolling-1150.csv --seed 2025 --out runs/rolling-2025
 ```
 
-Link `ECM::ecm` for the discrete and road-segment APIs or `ECM::ecm_cont` for the continuous and route models. Both targets are available with `add_subdirectory` and via `find_package(ECM 0.2 CONFIG REQUIRED)` using the install prefix in `CMAKE_PREFIX_PATH`.
+The lab writes raw trial CSVs, paired comparisons, and a manifest. Run
+`build/bin/solar-race --help` for a single scenario or to use your own route.
+The checked-in routes are synthetic. The SR7 preset uses published figures
+where available, and SR8 models a provisional battery-and-solar scenario.
+[Lab guide](apps/route-lab/README.md) · [SR7 and SR8 inputs and results](apps/route-lab/docs/sunswift-profiles.md)
 
-### Discrete stint
+## Use the library
 
-```cpp
-#include "ecm/ecm.hpp"
-#include "ecm/efficiency.hpp"
-#include <memory>
-#include <iostream>
+- **C++** builds against `ECM::ecm` for the core or `ECM::ecm_cont` for drive cycles and route model adapters. Both are available via `find_package(ECM 0.2 CONFIG REQUIRED)` and `add_subdirectory`. [C++ integration and examples](docs/library-guide.md)
+- **Python** builds the same C++ targets via `python -m pip install .` and exposes them as `import ecm`. The extension supports Python 3.8 or later. [Python example](docs/library-guide.md#python)
 
-int main() {
-    ecm::VehicleParams params;
-    params.X = 500.0;
+## Design and validation
 
-    auto eff = std::make_shared<ecm::StepEfficiency>();
-    ecm::ECM model(params, eff);
+- [System design](docs/architecture.md) covers the component interfaces, build targets, and simulation flow.
+- [Route energy adapters](docs/route-models.md) explain distance-preserving speed ramps and model substitution.
+- [Drive-cycle mathematics](docs/drive-cycle.md) covers signed drag, bisection at power transitions, motor maps, Gaussian quadrature, and closed-form checks.
+- [Experiment methods](apps/route-lab/docs/model.md) describe paired weather, battery accounting, and confidence intervals.
 
-    double energy = model.stint(10.0, 12.0, 1.0, 0.0, 0.0, 570);
-    std::cout << "Energy consumed: " << energy << std::endl;
-    return 0;
-}
-```
-
-### Road-segment energy and solar input
-
-`ecm/segment.hpp` provides a speed-and-distance API for batch route experiments. It reuses the library's force calculations and reports motion, traction and auxiliary energy separately, in watt-hours. The segment model cruises at one speed and accounts for net kinetic energy from entry to exit. The drivetrain has separate drive and regeneration efficiencies and a cap on recovered electrical power.
-
-```cpp
-#include <ecm/segment.hpp>
-
-const ecm::VehicleParams car{
-    .rho = 1.2, .Cd = 0.14, .A = 1.0, .m = 200, .Crr = 0.005, .X = 60,
-};
-const ecm::RoadSegment road{36'000, 20, 20, 20, 0, 0};
-const ecm::Drivetrain drivetrain{0.90, 0.55, 100};
-const ecm::SolarArray array{4, 0.20, 0.90};
-const auto drive = ecm::drive_energy(car, road, drivetrain);
-const double net_draw_wh = drive.demand_wh() - ecm::solar_energy_wh(array, 1000, drive.seconds);
-```
-
-A positive grade is rise divided by horizontal run (`0.01` is a 1% climb). Positive wind opposes travel. For the segment API, the library reports solar separately from vehicle demand so a caller can apply its own battery storage limits. The existing `stint()` APIs return joules.
-
-### Continuous drive cycle
-
-Use `ecm_cont::drive_cycle` with a time series of speed intervals to compute distance, wheel work, traction, auxiliaries, and collected solar energy. Each interval ramps linearly between its endpoint speeds. The solver integrates the ramps from rest and resolves propulsion and regeneration transitions within each interval. See the [equations and validation](docs/drive-cycle.md).
-
-```cpp
-#include <array>
-#include <ecm_cont/drive_cycle.hpp>
-
-const std::array profile{
-    ecm_cont::SpeedInterval{20, 0, 18, 0.01, 2, 650},
-    ecm_cont::SpeedInterval{90, 18, 18, 0.01, 2, 650},
-    ecm_cont::SpeedInterval{10, 18, 0, -0.02, 2, 650},
-};
-const auto energy = ecm_cont::drive_cycle(
-    car, profile, {0.9, 0.55, 450}, {4, 0.20, 0.90});
-const double net_draw_wh = energy.net_dc_wh();
-```
-
-The Python extension exposes the same C++ implementation as `ecm.drive_cycle`. The [validation example](examples/validate_drive_cycle.py) compares its output with an exact solution and fixed-step midpoint integration.
-
-### Route model adapters
-
-`ecm_cont/route_energy.hpp` exposes three route estimators that take the same
-road, wind and irradiance inputs and return duration, signed DC demand and
-solar generation. Choose segment, continuous speed cycle or a cycle with an
-interpolated motoring-efficiency map. See [the route adapter contract](docs/route-models.md)
-for a comparison and an example of substituting models.
-
----
-
-## Project Structure
-
-```
-ECM_module/
-├─ include/ecm/       # C++ headers
-├─ src/               # C++ source files
-├─ python/            # pybind11 bindings
-├─ tests/             # Python and C++ tests
-├─ CMakeLists.txt     # build configuration
-├─ setup.py           # pip install setup
-├─ pyproject.toml     # modern PEP517 build
-└─ README.md
-```
-
----
-
-## Testing
-
-Run the C++ and Python tests together from a CMake build with bindings enabled.
-
-```bash
-cmake -S . -B build-python -DECM_BUILD_PYTHON=ON
-cmake --build build-python --parallel
-ctest --test-dir build-python --output-on-failure
-```
-
-CMake uses an installed pybind11 3.0.1 or newer, and fetches v3.0.1 if none
-is available. With multiple Python environments, pass
-`-DPython3_EXECUTABLE=/path/to/python3` to choose the test interpreter.
-
----
-
-## Notes
-
-* `VehicleParams` contains static vehicle parameters.
-* `stint()` computes **energy consumed in a discrete time period**, taking `vi`, `vt`, `t`, `wind`, `slope`, and `S` as inputs.
-* Efficiency models can be extended by subclassing `EfficiencyModel`.
-
----
-
-## License
-
-See the [MIT License](LICENSE.md).
-
-
+[MIT License](LICENSE.md)
