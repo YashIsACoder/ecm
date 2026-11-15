@@ -45,4 +45,4 @@ Rscript --vanilla analysis/plot.R runs/outback-2025.csv docs/outback-pacing.png 
 | `src/main.cpp` | Run each policy on the same trial and emit CSV. |
 | `analysis/analyse.py` | Compare completion and reserve use, and pair driving times on common finishes. |
 
-Tests exercise the C++ library integration, deterministic draws, storage conservation, depletion midway through a leg, a hard pace cap, and the CLI.
+Tests exercise the C++ library integration, deterministic draws, storage conservation, depletion midway through a leg, a hard pace cap, and the CLI. The [benchmark](docs/benchmark.md) records throughput and the cost of switching to the existing ECM.
