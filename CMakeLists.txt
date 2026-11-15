@@ -129,7 +129,7 @@ if(ECM_BUILD_TESTS)
     add_test(NAME ECM.DriveCycle COMMAND ecm_drive_cycle_test)
 
     if(ECM_BUILD_PYTHON)
-        foreach(test_name IN ITEMS test_ecm test_cont)
+        foreach(test_name IN ITEMS test_ecm test_cont test_drive_cycle)
             add_test(NAME ECM.Python.${test_name}
                 COMMAND "${CMAKE_COMMAND}" -E env "PYTHONPATH=$<TARGET_FILE_DIR:ecm_py>"
                 "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/${test_name}.py")

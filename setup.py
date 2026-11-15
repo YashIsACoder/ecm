@@ -19,6 +19,7 @@ setup(
                 "src/ecm_cont/integrator.cpp",
                 "src/ecm_cont/dynamics.cpp",
                 "src/ecm_cont/ecm_continuous.cpp",
+                "src/ecm_cont/drive_cycle.cpp",
             ],
             include_dirs=["include"],
             cxx_std=20,

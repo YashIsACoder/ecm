@@ -33,3 +33,4 @@ jobs:
           python -m pip install dist/*.whl
           python tests/test_ecm.py
           python tests/test_cont.py
+          python tests/test_drive_cycle.py

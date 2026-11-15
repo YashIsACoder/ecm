@@ -10,6 +10,7 @@ The library is suitable for **simulations, testing, and research**, and can be p
 
 * **C++ core** for high-performance simulations
 * **Python bindings** via pybind11 (`import ecm`)
+* Continuous drive-cycle energy with speed ramps, signed wind, and regenerative power limits
 * Flexible **efficiency models** (e.g., stepwise efficiency)
 * Discrete **stint-based energy calculations**
 * Easy **vehicle parameter customization**
@@ -126,6 +127,26 @@ const double net_draw_wh = drive.demand_wh() - ecm::solar_energy_wh(array, 1000,
 ```
 
 A positive grade is rise divided by horizontal run (`0.01` is a 1% climb). Positive wind opposes travel. For the segment API, the library reports solar separately from vehicle demand so a caller can apply its own battery storage limits. The existing `stint()` APIs return joules.
+
+### Continuous drive cycle
+
+Use `ecm_cont::drive_cycle` with a time series of speed intervals to compute distance, wheel work, traction, auxiliaries, and collected solar energy. Each interval ramps linearly between its endpoint speeds. The solver integrates the ramps from rest and resolves propulsion and regeneration transitions within each interval. See the [equations and validation](docs/drive-cycle.md).
+
+```cpp
+#include <array>
+#include <ecm_cont/drive_cycle.hpp>
+
+const std::array profile{
+    ecm_cont::SpeedInterval{20, 0, 18, 0.01, 2, 650},
+    ecm_cont::SpeedInterval{90, 18, 18, 0.01, 2, 650},
+    ecm_cont::SpeedInterval{10, 18, 0, -0.02, 2, 650},
+};
+const auto energy = ecm_cont::drive_cycle(
+    car, profile, {0.9, 0.55, 450}, {4, 0.20, 0.90});
+const double net_draw_wh = energy.net_dc_wh();
+```
+
+The Python extension exposes the same C++ implementation as `ecm.drive_cycle`. The [validation example](examples/validate_drive_cycle.py) compares its output with an exact solution and fixed-step midpoint integration.
 
 ---
 
