@@ -27,3 +27,18 @@ build took about 4.5% longer and produced byte-identical 2,000-trial CSVs at
 The simulator links ECM directly in C++. Python launches the benchmark and
 analyses completed trials. ECM's pybind11 module is used by its Python
 consumers, so switching binding libraries would have no effect on this run.
+
+## Reusing pace evaluations
+
+The reserve-first policy now carries the chosen speed's energy estimate into
+the battery update. It also skips candidates that a leg's speed limit would
+clamp to a speed already evaluated.
+
+| Release build | Median | Range | Trials per second |
+| --- | ---: | ---: | ---: |
+| Before pace reuse (`074259f`) | 1.584 s | 1.582–1.657 s | 63,119 |
+| With pace reuse | 1.482 s | 1.481–1.500 s | 67,493 |
+
+The median elapsed time fell by 6.4% in a separate run of the same benchmark
+on the same Mac. Seeded 2,000-trial output matched byte for byte before and
+after the change at 4.5, 5.5 and 6.5 kWh.

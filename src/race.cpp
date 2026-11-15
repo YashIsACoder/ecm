@@ -15,6 +15,11 @@ struct LegEnergy {
     double net_wh() const { return demand_wh - sun_wh; }
 };
 
+struct PacedLeg {
+    double speed_kmh;
+    LegEnergy energy;
+};
+
 LegEnergy leg_energy(const Config& config, const Leg& leg, const Weather& weather,
                      double entry_speed_kmh, double cruise_speed_kmh, bool end_of_day) {
     auto vehicle = config.vehicle;
@@ -28,23 +33,32 @@ LegEnergy leg_energy(const Config& config, const Leg& leg, const Weather& weathe
     return {drive.seconds, drive.demand_wh(), sun_wh};
 }
 
-double select_speed(const Config& config, const Leg& leg, const Weather& weather,
-                    Policy policy, double stored_wh, double entry_kmh, bool end_of_day) {
+PacedLeg pace_leg(const Config& config, const Leg& leg, const Weather& weather,
+                  Policy policy, double stored_wh, double entry_kmh, bool end_of_day) {
+    const auto evaluate = [&](double target_kmh) {
+        const double speed = std::min(target_kmh, leg.pace_cap_kmh);
+        return PacedLeg{speed, leg_energy(config, leg, weather, entry_kmh, speed, end_of_day)};
+    };
     switch (policy) {
     case Policy::steady:
-        return std::min(82.0, leg.pace_cap_kmh);
+        return evaluate(82.0);
     case Policy::push:
-        return std::min(92.0, leg.pace_cap_kmh);
-    case Policy::reserve_first:
+        return evaluate(92.0);
+    case Policy::reserve_first: {
         // A buffer above the reporting reserve pays for later legs whose weather is unknown.
         const double target_wh = config.capacity_wh * std::max(config.reserve_soc, 0.35);
-        for (double candidate : {92.0, 85.0}) {
-            const double speed = std::min(candidate, leg.pace_cap_kmh);
-            if (stored_wh - leg_energy(config, leg, weather, entry_kmh, speed, end_of_day).net_wh() >= target_wh) {
-                return speed;
+        const auto fast = evaluate(92.0);
+        if (fast.speed_kmh <= 75.0 || stored_wh - fast.energy.net_wh() >= target_wh) {
+            return fast;
+        }
+        if (fast.speed_kmh > 85.0) {
+            const auto medium = evaluate(85.0);
+            if (stored_wh - medium.energy.net_wh() >= target_wh) {
+                return medium;
             }
         }
-        return std::min(75.0, leg.pace_cap_kmh);
+        return evaluate(75.0);
+    }
     }
     throw std::invalid_argument("unknown policy");
 }
@@ -119,8 +133,7 @@ Result simulate(std::span<const Leg> route, std::span<const Weather> weather, co
             result.solar_wh += parked_wh;
             store(parked_wh);
         }
-        const double speed = select_speed(config, leg, conditions, policy, stored_wh, entry_kmh, end_of_day);
-        const auto energy = leg_energy(config, leg, conditions, entry_kmh, speed, end_of_day);
+        const auto [speed, energy] = pace_leg(config, leg, conditions, policy, stored_wh, entry_kmh, end_of_day);
         const bool depleted = energy.net_wh() > stored_wh;
         // With constant average net draw within a leg, range until depletion is linear.
         const double portion = depleted ? stored_wh / energy.net_wh() : 1.0;
