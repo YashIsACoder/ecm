@@ -14,6 +14,7 @@ setup(
                 "python/bindings.cpp",
                 "src/ecm.cpp",
                 "src/efficiency.cpp",
+                "src/efficiency_map.cpp",
                 "src/forces.cpp",
                 "src/segment.cpp",
                 "src/ecm_cont/integrator.cpp",

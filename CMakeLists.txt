@@ -22,6 +22,7 @@ option(ECM_BUILD_TESTS  "Build C++ tests" ON)
 add_library(ecm STATIC
     src/forces.cpp
     src/efficiency.cpp
+    src/efficiency_map.cpp
     src/ecm.cpp
     src/segment.cpp
 )

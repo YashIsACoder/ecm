@@ -52,8 +52,13 @@ void add_crossings(std::vector<double>& knots, const Function& function) {
     std::ranges::sort(knots);
 }
 
+struct MapSampling {
+    const ecm::EfficiencyMap* efficiency = nullptr;
+    double max_speed_step_mps = 0.0;
+};
+
 void integrate_traction(const ecm::VehicleParams& vehicle, const SpeedInterval& interval,
-                        const ecm::Drivetrain& drivetrain, DriveCycleEnergy& energy) {
+                        const ecm::Drivetrain& drivetrain, MapSampling sampling, DriveCycleEnergy& energy) {
     const ecm::Forces forces(vehicle);
     const double acceleration = (interval.final_speed_mps - interval.initial_speed_mps) / interval.seconds;
     const double constant_force = finite(vehicle.m * acceleration +
@@ -64,9 +69,14 @@ void integrate_traction(const ecm::VehicleParams& vehicle, const SpeedInterval& 
         const double relative_air = speed + wind;
         return finite(speed * (constant_force + drag_coefficient * relative_air * std::abs(relative_air)));
     };
-    const auto dc_power = [&](double wheel) {
-        return wheel >= 0.0 ? finite(wheel / drivetrain.drive_efficiency)
-                            : std::max(wheel * drivetrain.regen_efficiency, -drivetrain.max_regen_power_w);
+    const auto dc_power = [&](double speed, double wheel) {
+        if (wheel < 0.0) {
+            return std::max(wheel * drivetrain.regen_efficiency, -drivetrain.max_regen_power_w);
+        }
+        const double efficiency = sampling.efficiency && wheel > 0.0
+            ? sampling.efficiency->at(finite(speed / vehicle.rw), finite((wheel / speed) * vehicle.rw))
+            : drivetrain.drive_efficiency;
+        return finite(wheel / efficiency);
     };
 
     const auto [first, last] = std::minmax(interval.initial_speed_mps, interval.final_speed_mps);
@@ -74,8 +84,11 @@ void integrate_traction(const ecm::VehicleParams& vehicle, const SpeedInterval& 
     if (first == last) {
         const double wheel = wheel_power(first);
         energy.wheel_wh += hours * wheel;
-        energy.traction_wh += hours * dc_power(wheel);
+        energy.traction_wh += hours * dc_power(first, wheel);
         return;
+    }
+    if (sampling.efficiency && (last - first) / sampling.max_speed_step_mps > 1'000'000.0) {
+        throw std::invalid_argument("mapped drive cycle requests more than one million panels per speed interval");
     }
 
     // A cut at zero relative airspeed separates the drag polynomials. The
@@ -101,24 +114,34 @@ void integrate_traction(const ecm::VehicleParams& vehicle, const SpeedInterval& 
         });
     }
 
-    // Cubic polynomials are integrated exactly by two Gauss–Legendre points.
+    // Two Gauss–Legendre points are exact on the cubic pieces. A map makes
+    // motoring power nonpolynomial, so those pieces use a composite rule.
     constexpr double left_node = 0.21132486540518712;
     constexpr double right_node = 1.0 - left_node;
     for (std::size_t i = 1; i < knots.size(); ++i) {
-        const double left = knots[i - 1];
-        const double right = knots[i];
-        const double duration_hours = hours * ((right - left) / (last - first));
-        const double left_power = wheel_power(std::lerp(left, right, left_node));
-        const double right_power = wheel_power(std::lerp(left, right, right_node));
-        energy.wheel_wh += duration_hours * std::midpoint(left_power, right_power);
-        energy.traction_wh += duration_hours * std::midpoint(dc_power(left_power), dc_power(right_power));
+        const double low = knots[i - 1];
+        const double high = knots[i];
+        const auto panels = sampling.efficiency && wheel_power(std::midpoint(low, high)) > 0.0
+            ? static_cast<std::size_t>(std::max(1.0, std::ceil((high - low) / sampling.max_speed_step_mps)))
+            : std::size_t{1};
+        for (std::size_t panel = 0; panel < panels; ++panel) {
+            const double left = std::lerp(low, high, static_cast<double>(panel) / panels);
+            const double right = std::lerp(low, high, static_cast<double>(panel + 1) / panels);
+            const double duration_hours = hours * ((right - left) / (last - first));
+            const double left_speed = std::lerp(left, right, left_node);
+            const double right_speed = std::lerp(left, right, right_node);
+            const double left_power = wheel_power(left_speed);
+            const double right_power = wheel_power(right_speed);
+            energy.wheel_wh += duration_hours * std::midpoint(left_power, right_power);
+            energy.traction_wh += duration_hours *
+                std::midpoint(dc_power(left_speed, left_power), dc_power(right_speed, right_power));
+        }
     }
 }
 
-}  // namespace
-
-DriveCycleEnergy drive_cycle(const ecm::VehicleParams& vehicle, std::span<const SpeedInterval> intervals,
-                             const ecm::Drivetrain& drivetrain, const ecm::SolarArray& array) {
+DriveCycleEnergy evaluate_cycle(const ecm::VehicleParams& vehicle, std::span<const SpeedInterval> intervals,
+                                const ecm::Drivetrain& drivetrain, const ecm::SolarArray& array,
+                                MapSampling sampling) {
     ecm::detail::validate_drive(vehicle, drivetrain);
     if (intervals.empty()) {
         throw std::invalid_argument("drive cycle requires at least one speed interval");
@@ -140,7 +163,7 @@ DriveCycleEnergy drive_cycle(const ecm::VehicleParams& vehicle, std::span<const 
         result.distance_m += interval.seconds * std::midpoint(interval.initial_speed_mps, interval.final_speed_mps);
         result.auxiliary_wh += vehicle.X * hours;
         result.solar_wh += ecm::solar_energy_wh(array, interval.irradiance_w_m2, interval.seconds);
-        integrate_traction(vehicle, interval, drivetrain, result);
+        integrate_traction(vehicle, interval, drivetrain, sampling, result);
         previous_speed = interval.final_speed_mps;
     }
     if (!std::isfinite(result.seconds) || !std::isfinite(result.distance_m) ||
@@ -148,6 +171,22 @@ DriveCycleEnergy drive_cycle(const ecm::VehicleParams& vehicle, std::span<const 
         throw std::overflow_error("drive cycle totals exceed double precision range");
     }
     return result;
+}
+
+}  // namespace
+
+DriveCycleEnergy drive_cycle(const ecm::VehicleParams& vehicle, std::span<const SpeedInterval> intervals,
+                             const ecm::Drivetrain& drivetrain, const ecm::SolarArray& array) {
+    return evaluate_cycle(vehicle, intervals, drivetrain, array, {});
+}
+
+DriveCycleEnergy drive_cycle_mapped(const ecm::VehicleParams& vehicle, std::span<const SpeedInterval> intervals,
+                                    const ecm::Drivetrain& drivetrain, const ecm::EfficiencyMap& map,
+                                    double max_speed_step_mps, const ecm::SolarArray& array) {
+    if (!ecm::detail::positive(vehicle.rw) || !ecm::detail::positive(max_speed_step_mps)) {
+        throw std::invalid_argument("mapped drive cycle requires positive finite wheel radius and speed step");
+    }
+    return evaluate_cycle(vehicle, intervals, drivetrain, array, {&map, max_speed_step_mps});
 }
 
 }  // namespace ecm_cont

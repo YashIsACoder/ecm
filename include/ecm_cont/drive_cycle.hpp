@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ecm/efficiency_map.hpp"
 #include "ecm/segment.hpp"
 
 #include <span>
@@ -35,5 +36,15 @@ struct DriveCycleEnergy {
                                            std::span<const SpeedInterval> intervals,
                                            const ecm::Drivetrain& drivetrain,
                                            const ecm::SolarArray& array = {});
+
+// Wheel speed and torque select motoring efficiency from the map. Positive
+// speed step (m/s) bounds the quadrature panel width. Regeneration remains
+// governed by drivetrain.regen_efficiency and drivetrain.max_regen_power_w.
+[[nodiscard]] DriveCycleEnergy drive_cycle_mapped(const ecm::VehicleParams& vehicle,
+                                                  std::span<const SpeedInterval> intervals,
+                                                  const ecm::Drivetrain& drivetrain,
+                                                  const ecm::EfficiencyMap& map,
+                                                  double max_speed_step_mps = 0.5,
+                                                  const ecm::SolarArray& array = {});
 
 }  // namespace ecm_cont

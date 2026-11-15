@@ -55,6 +55,24 @@ exact arithmetic. Floating-point evaluation and numerical root location
 determine the remaining error. Constant speed is integrated directly.
 [NIST Digital Library of Mathematical Functions, Gaussian quadrature](https://dlmf.nist.gov/3.5#v)
 
+## Mapped motoring efficiency
+
+`drive_cycle_mapped` evaluates a rectangular `ecm::EfficiencyMap` in
+wheel-equivalent angular speed (rad/s) and torque (N·m). At each positive
+wheel-power sample, it computes `ω = v/r` and `τ = r P_wheel/v`, then
+interpolates the four neighbouring efficiencies. Axes are strictly
+increasing, with entries stored speed-major. A query outside the map
+uses the nearest boundary. Lookup takes logarithmic time in both axes.
+The map replaces the fixed motoring efficiency. The supplied drivetrain
+specifies regeneration efficiency and the recovery cap.
+
+The ratio `P_wheel/η(ω,τ)` need not be a polynomial, so a composite
+two-point Gauss–Legendre rule subdivides motoring regions by a configurable
+maximum speed step. Refining this step provides a convergence check when
+interpolation crosses cell boundaries. A unit test compares the solver to
+the closed-form integral of `100v/(0.5 + 0.04v)` and checks that refinement
+reduces the error.
+
 ## Validation
 
 Unit tests check kinetic-energy conservation during a lossless mechanical
