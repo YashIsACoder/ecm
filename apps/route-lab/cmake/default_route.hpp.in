@@ -1,0 +1,7 @@
+#pragma once
+
+namespace solar_race {
+
+inline constexpr char default_route_csv[] = R"ecm_route(@ECM_DEFAULT_ROUTE_CSV@)ecm_route";
+
+}  // namespace solar_race

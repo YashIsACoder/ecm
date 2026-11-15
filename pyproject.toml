@@ -1,3 +1,29 @@
 [build-system]
-requires = ["setuptools>=65", "wheel", "pybind11>=3.0.1,<3.1"]
-build-backend = "setuptools.build_meta"
+requires = ["scikit-build-core>=0.12", "pybind11>=3.0.1,<3.1"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "ecm"
+description = "Energy Consumption Model for solar-electric vehicles"
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+license-files = ["LICENSE.md"]
+dynamic = ["version"]
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+cmake.version = ">=3.20"
+wheel.packages = []
+install.components = ["python"]
+
+[tool.scikit-build.cmake.define]
+ECM_BUILD_PYTHON = "ON"
+ECM_BUILD_ROUTE_LAB = "OFF"
+ECM_BUILD_TESTS = "OFF"
+ECM_PYTHON_INSTALL_DIR = "."
+
+[tool.scikit-build.metadata.version]
+provider = "scikit_build_core.metadata.regex"
+input = "CMakeLists.txt"
+regex = 'project\(ECM VERSION (?P<value>[0-9]+\.[0-9]+\.[0-9]+)'

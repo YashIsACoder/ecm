@@ -73,6 +73,11 @@ std::vector<Leg> read_route(const std::filesystem::path& path) {
     if (!input) {
         throw std::runtime_error("cannot open route " + path.string());
     }
+    return read_route(input, path.string());
+}
+
+std::vector<Leg> read_route(std::istream& input, std::string_view source_name) {
+    const std::string name(source_name);
     std::string line;
     constexpr std::array<std::string_view, 6> columns{
         "day", "destination", "distance_km", "grade_pct", "clear_sky_w_m2", "pace_cap_kmh",
@@ -89,7 +94,7 @@ std::vector<Leg> read_route(const std::filesystem::path& path) {
             throw std::runtime_error("unexpected route CSV header");
         }
     } catch (const std::runtime_error& error) {
-        throw std::runtime_error(path.string() + ":1: " + error.what());
+        throw std::runtime_error(name + ":1: " + error.what());
     }
 
     std::vector<Leg> route;
@@ -120,11 +125,11 @@ std::vector<Leg> read_route(const std::filesystem::path& path) {
             }
             route.push_back(std::move(leg));
         } catch (const std::exception& error) {
-            throw std::runtime_error(path.string() + ':' + std::to_string(line_number) + ": " + error.what());
+            throw std::runtime_error(name + ':' + std::to_string(line_number) + ": " + error.what());
         }
     }
     if (route.empty() || input.bad()) {
-        throw std::runtime_error("route is empty or unreadable: " + path.string());
+        throw std::runtime_error("route is empty or unreadable: " + name);
     }
     return route;
 }

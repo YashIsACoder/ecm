@@ -1,7 +1,7 @@
 #include "ecm/segment.hpp"
 
 #include "ecm/forces.hpp"
-#include "energy_inputs.hpp"
+#include "detail/energy_inputs.hpp"
 
 #include <algorithm>
 #include <cmath>

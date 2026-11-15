@@ -1,6 +1,6 @@
 #include "ecm_cont/route_energy.hpp"
 
-#include "../energy_inputs.hpp"
+#include "detail/energy_inputs.hpp"
 
 #include <algorithm>
 #include <cmath>

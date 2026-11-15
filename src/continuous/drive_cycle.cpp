@@ -1,6 +1,6 @@
 #include "ecm_cont/drive_cycle.hpp"
 
-#include "../energy_inputs.hpp"
+#include "detail/energy_inputs.hpp"
 #include "ecm/forces.hpp"
 
 #include <algorithm>

@@ -5,6 +5,7 @@
 #include <array>
 #include <filesystem>
 #include <functional>
+#include <iosfwd>
 #include <random>
 #include <span>
 #include <string>
@@ -65,6 +66,7 @@ struct Result {
 };
 
 [[nodiscard]] std::vector<Leg> read_route(const std::filesystem::path& path);
+[[nodiscard]] std::vector<Leg> read_route(std::istream& csv, std::string_view source_name);
 [[nodiscard]] std::vector<Weather> draw_weather(std::span<const Leg> route, std::mt19937_64& random);
 [[nodiscard]] Result simulate(std::span<const Leg> route, std::span<const Weather> weather,
                               const Config& config, Policy policy);

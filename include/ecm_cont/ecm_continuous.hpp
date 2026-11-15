@@ -1,7 +1,6 @@
 #pragma once
 #include "ecm/params.hpp"
 #include "ecm/efficiency.hpp"
-#include "ecm_cont/ecm_continuous.hpp"
 #include "ecm_cont/integrator_dispatch.hpp"
 
 namespace ecm_cont {

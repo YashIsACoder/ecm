@@ -1,6 +1,6 @@
 #include "ecm/efficiency_map.hpp"
 
-#include "energy_inputs.hpp"
+#include "detail/energy_inputs.hpp"
 
 #include <algorithm>
 #include <functional>

@@ -4,6 +4,7 @@
 build/
 Build/
 build-*/
+/runs/
 
 # CMake
 CMakeFiles/

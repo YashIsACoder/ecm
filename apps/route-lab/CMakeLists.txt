@@ -1,38 +1,30 @@
-cmake_minimum_required(VERSION 3.22)
-project(solar_race_monte_carlo VERSION 0.1.0 LANGUAGES CXX)
+add_library(ecm_route_lab STATIC src/race.cpp src/route.cpp src/scenario.cpp)
+target_include_directories(ecm_route_lab PUBLIC include)
+target_link_libraries(ecm_route_lab PUBLIC ECM::ecm_cont)
+set_target_properties(ecm_route_lab PROPERTIES CXX_EXTENSIONS OFF)
 
-set(ECM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../ecm" CACHE PATH "Path to the YashIsACoder/ecm checkout")
-find_package(ECM 0.2 CONFIG QUIET)
-if(NOT TARGET ECM::ecm_cont)
-  if(NOT EXISTS "${ECM_SOURCE_DIR}/include/ecm_cont/route_energy.hpp")
-    message(FATAL_ERROR "Install ECM 0.2 or set ECM_SOURCE_DIR to an ECM checkout with route model support.")
-  endif()
-  set(ECM_BUILD_PYTHON OFF)
-  set(ECM_BUILD_TESTS OFF)
-  add_subdirectory("${ECM_SOURCE_DIR}" ecm-build)
-endif()
-
-add_library(solar_race src/race.cpp src/route.cpp src/scenario.cpp)
-target_include_directories(solar_race PUBLIC include)
-target_link_libraries(solar_race PUBLIC ECM::ecm_cont)
-target_compile_features(solar_race PUBLIC cxx_std_20)
-set_target_properties(solar_race PROPERTIES CXX_EXTENSIONS OFF)
+set(default_route "${CMAKE_CURRENT_SOURCE_DIR}/data/outback-2025-style.csv")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${default_route}")
+file(READ "${default_route}" ECM_DEFAULT_ROUTE_CSV)
+configure_file(cmake/default_route.hpp.in generated/default_route.hpp @ONLY)
 
 add_executable(solar-race src/main.cpp)
-target_link_libraries(solar-race PRIVATE solar_race)
+target_include_directories(solar-race PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+target_link_libraries(solar-race PRIVATE ecm_route_lab)
+set_target_properties(solar-race PROPERTIES
+    CXX_EXTENSIONS OFF
+    RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin"
+)
 
-include(CTest)
-if(BUILD_TESTING)
-  add_executable(race_tests tests/race_tests.cpp)
-  target_link_libraries(race_tests PRIVATE solar_race)
-  target_compile_definitions(race_tests PRIVATE TEST_ROUTE="${CMAKE_CURRENT_SOURCE_DIR}/tests/route.csv")
-  add_test(NAME race_model COMMAND race_tests)
-  add_test(NAME race_cli COMMAND solar-race --route "${CMAKE_CURRENT_SOURCE_DIR}/tests/route.csv" --trials 3 --seed 12)
-  set_tests_properties(race_cli PROPERTIES PASS_REGULAR_EXPRESSION "3,reserve-first,")
-  add_test(NAME sr7_cycle COMMAND solar-race --route "${CMAKE_CURRENT_SOURCE_DIR}/tests/route.csv"
-    --vehicle sr7 --model cycle --trials 2 --seed 42)
-  add_test(NAME sr8_mapped COMMAND solar-race --route "${CMAKE_CURRENT_SOURCE_DIR}/tests/route.csv"
-    --vehicle sr8 --model mapped --trials 2 --seed 42)
-  add_test(NAME invalid_pack COMMAND solar-race --pack-kwh 0)
-  set_tests_properties(invalid_pack PROPERTIES WILL_FAIL TRUE)
+install(TARGETS solar-race
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    COMPONENT route-lab
+)
+install(FILES "${default_route}" data/rolling-1150.csv
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/ecm/routes"
+    COMPONENT route-lab
+)
+
+if(ECM_BUILD_TESTS)
+    add_subdirectory(tests)
 endif()
