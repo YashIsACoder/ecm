@@ -23,6 +23,7 @@ add_library(ecm STATIC
     src/forces.cpp
     src/efficiency.cpp
     src/ecm.cpp
+    src/segment.cpp
 )
 
 target_include_directories(ecm
@@ -108,11 +109,14 @@ if(ECM_BUILD_TESTS)
 
     target_link_libraries(ecm_test
         PRIVATE
-            ecm
             ecm_cont
     )
 
     add_test(NAME ECM.Basic COMMAND ecm_test)
+
+    add_executable(ecm_segment_test tests/test_segment.cpp)
+    target_link_libraries(ecm_segment_test PRIVATE ecm)
+    add_test(NAME ECM.Segment COMMAND ecm_segment_test)
 endif()
 
 # =========================
