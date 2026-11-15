@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <optional>
 #include <stdexcept>
 #include <string_view>
@@ -31,6 +32,10 @@ void help(std::ostream& output) {
         << "--weather baseline|posterior selects the weather model.\n"
         << "--forecast-report emits calibration diagnostics as JSON and exits.\n"
         << "Defaults: built-in outback route, 2000 trials, seed 2025, reference vehicle and segment model.\n"
+        << "Pacing: --steady-kmh N --push-kmh N --reserve-strategy tiers|envelope\n"
+        << "        --reserve-fast-kmh N --reserve-medium-kmh N --reserve-slow-kmh N --reserve-target-pct N\n"
+        << "Solar:  --array-m2 N --cell-efficiency-pct N --system-efficiency-pct N --parked-wh-m2 N\n"
+        << "Weather stress test: --solar-multiplier N --headwind-offset-mps N\n"
         << "--pack-kwh overrides the selected vehicle's usable capacity.\n";
 }
 
@@ -74,14 +79,14 @@ void forecast_report(std::uint64_t seed) {
     out << "},\"retained_per_chain\":" << result.chains.front().samples.size() << ",\"plot_stride\":8}\n";
 }
 
-double pack_wh(std::string_view input) {
+double number(std::string_view input, std::string_view option, double minimum, double maximum) {
     const std::string value(input);
     std::size_t end = 0;
-    const double capacity_wh = 1000.0 * std::stod(value, &end);
-    if (end != value.size() || !std::isfinite(capacity_wh) || capacity_wh <= 0.0) {
-        throw std::invalid_argument("pack capacity must be a positive finite number of kWh");
+    const double parsed = std::stod(value, &end);
+    if (end != value.size() || !(parsed >= minimum && parsed <= maximum)) {
+        throw std::invalid_argument("invalid value for " + std::string(option));
     }
-    return capacity_wh;
+    return parsed;
 }
 
 }  // namespace
@@ -92,7 +97,9 @@ int main(int argc, char** argv) {
         ecm::lab::Experiment experiment;
         std::string_view vehicle = "reference";
         std::string_view model = "segment";
-        std::optional<double> capacity;
+        std::optional<double> capacity, array_area, cell_efficiency, system_efficiency, parked_exposure;
+        ecm::lab::StrategyConfig strategy;
+        ecm::lab::WeatherAdjustments weather_adjustments;
         std::optional<std::uint64_t> traced_trial;
         bool race_schedule = false;
         bool describe_forecast = false;
@@ -110,10 +117,6 @@ int main(int argc, char** argv) {
                 describe_forecast = true;
                 continue;
             }
-            if (option != "--route" && option != "--trials" && option != "--seed" && option != "--pack-kwh" &&
-                option != "--vehicle" && option != "--model" && option != "--trace-trial" && option != "--weather") {
-                throw std::invalid_argument("unknown option " + std::string(option));
-            }
             if (++i == argc) {
                 throw std::invalid_argument("missing value for " + std::string(option));
             }
@@ -123,7 +126,10 @@ int main(int argc, char** argv) {
             } else if (option == "--trials") {
                 experiment.trials = unsigned_value(value);
             } else if (option == "--pack-kwh") {
-                capacity = pack_wh(value);
+                capacity = 1000.0 * number(value, option, 0, std::numeric_limits<double>::max());
+                if (!std::isfinite(*capacity) || *capacity <= 0.0) {
+                    throw std::invalid_argument("pack capacity must be a positive finite number of kWh");
+                }
             } else if (option == "--vehicle") {
                 vehicle = value;
             } else if (option == "--model") {
@@ -134,8 +140,38 @@ int main(int argc, char** argv) {
                 if (value == "posterior") experiment.weather = ecm::lab::WeatherModel::posterior;
                 else if (value == "baseline") experiment.weather = ecm::lab::WeatherModel::baseline;
                 else throw std::invalid_argument("weather must be baseline or posterior");
-            } else {
+            } else if (option == "--seed") {
                 experiment.seed = unsigned_value(value);
+            } else if (option == "--reserve-strategy") {
+                if (value == "envelope") strategy.reserve_strategy = ecm::lab::ReserveStrategy::energy_envelope;
+                else if (value == "tiers") strategy.reserve_strategy = ecm::lab::ReserveStrategy::tiers;
+                else throw std::invalid_argument("reserve strategy must be tiers or envelope");
+            } else if (option == "--steady-kmh") {
+                strategy.steady_kmh = number(value, option, 20, 140);
+            } else if (option == "--push-kmh") {
+                strategy.push_kmh = number(value, option, 20, 140);
+            } else if (option == "--reserve-fast-kmh") {
+                strategy.reserve_fast_kmh = number(value, option, 20, 140);
+            } else if (option == "--reserve-medium-kmh") {
+                strategy.reserve_medium_kmh = number(value, option, 20, 140);
+            } else if (option == "--reserve-slow-kmh") {
+                strategy.reserve_slow_kmh = number(value, option, 20, 140);
+            } else if (option == "--reserve-target-pct") {
+                strategy.reserve_target_soc = number(value, option, 0, 100) / 100.0;
+            } else if (option == "--array-m2") {
+                array_area = number(value, option, 0, 30);
+            } else if (option == "--cell-efficiency-pct") {
+                cell_efficiency = number(value, option, .01, 100) / 100.0;
+            } else if (option == "--system-efficiency-pct") {
+                system_efficiency = number(value, option, .01, 100) / 100.0;
+            } else if (option == "--parked-wh-m2") {
+                parked_exposure = number(value, option, 0, 10000);
+            } else if (option == "--solar-multiplier") {
+                weather_adjustments.solar_multiplier = number(value, option, 0, 2);
+            } else if (option == "--headwind-offset-mps") {
+                weather_adjustments.headwind_offset_mps = number(value, option, -25, 25);
+            } else {
+                throw std::invalid_argument("unknown option " + std::string(option));
             }
         }
         if (describe_forecast) {
@@ -153,13 +189,20 @@ int main(int argc, char** argv) {
         config.energy_model = ecm::lab::route_energy_model(model);
         config.capacity_wh = capacity.value_or(config.capacity_wh);
         config.race_schedule = race_schedule;
+        config.strategy = strategy;
+        config.weather_adjustments = weather_adjustments;
+        config.array.area_m2 = array_area.value_or(config.array.area_m2);
+        config.array.cell_efficiency = cell_efficiency.value_or(config.array.cell_efficiency);
+        config.array.system_efficiency = system_efficiency.value_or(config.array.system_efficiency);
+        config.parked_clear_sky_wh_m2 = parked_exposure.value_or(config.parked_clear_sky_wh_m2);
         const auto route = route_path ? ecm::lab::read_route(*route_path) : ecm::lab::default_route();
         ecm::lab::TrialTrace trace;
         if (traced_trial) {
             std::cerr << "policy,leg,distance_km,speed_kmh,soc_pct,solar_factor,headwind_mps,rolling_factor,"
                          "solar_wh,demand_wh,parked_wh,depleted,elapsed_hours,depart_soc_pct,spilled_wh,"
                          "irradiance_w_m2,drag_wh,rolling_wh,climb_wh,kinetic_wh,traction_wh,auxiliary_wh,"
-                         "recovered_wh,race_depart_hours,race_arrive_hours,control_hours,overnight_hours\n"
+                         "recovered_wh,race_depart_hours,race_arrive_hours,control_hours,overnight_hours,"
+                         "mean_speed_kmh,planned_arrival_soc_pct\n"
                       << std::fixed << std::setprecision(6);
             trace = {*traced_trial, [](ecm::lab::Policy policy, const ecm::lab::LegObservation& leg) {
                 std::cerr << ecm::lab::policy_name(policy) << ',' << leg.leg << ',' << leg.distance_km << ','
@@ -176,7 +219,9 @@ int main(int argc, char** argv) {
                     std::cerr << ",,,,,,,";
                 }
                 std::cerr << ',' << leg.race_depart_hours << ',' << leg.race_arrive_hours << ',' << leg.control_hours
-                    << ',' << leg.overnight_hours << '\n';
+                    << ',' << leg.overnight_hours << ',' << leg.mean_speed_kmh << ',';
+                if (leg.planned_arrival_soc) std::cerr << 100.0 * *leg.planned_arrival_soc;
+                std::cerr << '\n';
             }};
         }
         std::cout << "trial,policy,completed,reserve_breached,distance_km,drive_hours,finish_soc_pct,min_soc_pct,"

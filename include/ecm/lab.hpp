@@ -37,6 +37,23 @@ struct Weather {
 using RouteEnergyModel = std::function<ecm_cont::RouteEnergy(
     const ecm_cont::RouteInput&, const ecm::VehicleParams&, const ecm::Drivetrain&, const ecm::SolarArray&)>;
 
+enum class ReserveStrategy { tiers, energy_envelope };
+
+struct StrategyConfig {
+    double steady_kmh = 82.0;
+    double push_kmh = 92.0;
+    double reserve_fast_kmh = 92.0;
+    double reserve_medium_kmh = 85.0;
+    double reserve_slow_kmh = 75.0;
+    double reserve_target_soc = 0.35;  // Tier buffer or minimum envelope charge.
+    ReserveStrategy reserve_strategy = ReserveStrategy::tiers;
+};
+
+struct WeatherAdjustments {
+    double solar_multiplier = 1.0;  // Multiplies driving and parked clear-sky fractions.
+    double headwind_offset_mps = 0.0;
+};
+
 struct Config {
     ecm::VehicleParams vehicle{
         .rho = 1.18, .Cd = 0.100, .A = 1.0, .m = 225.0, .g = 9.80665, .Crr = 0.0042, .X = 65.0,
@@ -49,6 +66,8 @@ struct Config {
     double parked_clear_sky_wh_m2 = 2200.0;
     RouteEnergyModel energy_model = ecm_cont::segment_route_energy;
     bool race_schedule = false;
+    StrategyConfig strategy;
+    WeatherAdjustments weather_adjustments;
 };
 
 [[nodiscard]] Config vehicle_config(std::string_view name);
@@ -106,6 +125,8 @@ struct LegObservation {
     double race_arrive_hours;
     double control_hours;
     double overnight_hours;
+    double mean_speed_kmh = 0.0;  // Distance over simulated driving time, including ramps.
+    std::optional<double> planned_arrival_soc;  // Envelope target, possibly above capacity.
 };
 
 using LegSink = std::function<void(const LegObservation&)>;

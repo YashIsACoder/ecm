@@ -1,6 +1,7 @@
 #include "ecm/lab.hpp"
 #include "ecm/forecast.hpp"
 #include "default_route.hpp"
+#include "race_plan.hpp"
 
 #include <sstream>
 #include <stdexcept>
@@ -21,6 +22,7 @@ void run_experiment(std::span<const Leg> route, const Config& config,
         throw std::invalid_argument("traced trial must be between 1 and the number of trials");
     }
 
+    const auto targets = detail::prepare_race(route, config);
     std::mt19937_64 random(experiment.seed);
     std::optional<ForecastCalibration> calibration;
     if (experiment.weather == WeatherModel::posterior) {
@@ -30,13 +32,11 @@ void run_experiment(std::span<const Leg> route, const Config& config,
         const auto weather = calibration ? draw_forecast_weather(route, *calibration, random)
                                          : draw_weather(route, random);
         for (const auto policy : policies) {
+            LegSink leg_sink;
             if (trace.sink && trace.trial == trial + 1) {
-                sink({trial + 1, policy, simulate(route, weather, config, policy, [&](const LegObservation& leg) {
-                    trace.sink(policy, leg);
-                })});
-            } else {
-                sink({trial + 1, policy, simulate(route, weather, config, policy)});
+                leg_sink = [&](const LegObservation& leg) { trace.sink(policy, leg); };
             }
+            sink({trial + 1, policy, detail::simulate_prepared(route, weather, config, policy, targets, leg_sink)});
         }
     }
 }

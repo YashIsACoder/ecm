@@ -1,4 +1,4 @@
-#include "ecm/lab.hpp"
+#include "race_plan.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -28,31 +28,75 @@ ecm_cont::RouteEnergy leg_energy(const Config& config, const Leg& leg, const Wea
     return energy;
 }
 
+bool finishes_stage(std::span<const Leg> route, std::size_t index) {
+    return index + 1 < route.size() && route[index].day != route[index + 1].day;
+}
+
+bool control_stop(const Leg& leg, const Config& config, bool final_leg) {
+    return config.race_schedule && !final_leg && leg.control_minutes > 0.0;
+}
+
+Weather adjusted_weather(Weather weather, const WeatherAdjustments& adjustment) {
+    if (adjustment.solar_multiplier != 1.0) {
+        weather.solar_factor = std::min(weather.solar_factor * adjustment.solar_multiplier, 1.0);
+        weather.park_solar_factor = std::min(weather.park_solar_factor * adjustment.solar_multiplier, 1.0);
+    }
+    weather.headwind_mps += adjustment.headwind_offset_mps;
+    return weather;
+}
+
+double parked_generation(const Config& config, const Weather& weather) {
+    // A one-hour equivalent irradiance gives the prescribed Wh/m² exposure.
+    return ecm::solar_energy_wh(config.array, config.parked_clear_sky_wh_m2 * weather.park_solar_factor, 3600.0);
+}
+
+std::array<double, 9> pace_grid(const StrategyConfig& strategy, double cap) {
+    const double high = std::min(strategy.reserve_fast_kmh, cap);
+    const double low = std::min(strategy.reserve_slow_kmh, high);
+    std::array<double, 9> speeds{};
+    for (std::size_t index = 0; index < speeds.size(); ++index) {
+        speeds[index] = std::lerp(high, low, static_cast<double>(index) / (speeds.size() - 1));
+    }
+    return speeds;
+}
+
 PacedLeg pace_leg(const Config& config, const Leg& leg, const Weather& weather,
-                  Policy policy, double stored_wh, double entry_kmh, bool end_of_day) {
+                  Policy policy, double stored_wh, double entry_kmh, bool end_of_day,
+                  std::optional<double> arrival_target) {
     const auto evaluate = [&](double target_kmh) {
         const double speed = std::min(target_kmh, leg.pace_cap_kmh);
         return PacedLeg{speed, leg_energy(config, leg, weather, entry_kmh, speed, end_of_day)};
     };
+    const auto& strategy = config.strategy;
     switch (policy) {
     case Policy::steady:
-        return evaluate(82.0);
+        return evaluate(strategy.steady_kmh);
     case Policy::push:
-        return evaluate(92.0);
+        return evaluate(strategy.push_kmh);
     case Policy::reserve_first: {
-        // A buffer above the reporting reserve pays for later legs whose weather is unknown.
-        const double target_wh = config.capacity_wh * std::max(config.reserve_soc, 0.35);
-        const auto fast = evaluate(92.0);
-        if (fast.speed_kmh <= 75.0 || stored_wh - fast.energy.net_wh() >= target_wh) {
-            return fast;
-        }
-        if (fast.speed_kmh > 85.0) {
-            const auto medium = evaluate(85.0);
-            if (stored_wh - medium.energy.net_wh() >= target_wh) {
-                return medium;
+        if (arrival_target) {
+            const auto speeds = pace_grid(strategy, leg.pace_cap_kmh);
+            auto best = evaluate(speeds.front());
+            if (speeds.front() == speeds.back() ||
+                std::min(config.capacity_wh, stored_wh - best.energy.net_wh()) >= *arrival_target) return best;
+            for (const double speed : std::span(speeds).subspan(1)) {
+                const auto candidate = evaluate(speed);
+                if (std::min(config.capacity_wh, stored_wh - candidate.energy.net_wh()) >= *arrival_target) {
+                    return candidate;
+                }
+                if (candidate.energy.net_wh() < best.energy.net_wh()) best = candidate;
             }
+            return best;
         }
-        return evaluate(75.0);
+
+        const double target_wh = config.capacity_wh * std::max(config.reserve_soc, strategy.reserve_target_soc);
+        const auto fast = evaluate(strategy.reserve_fast_kmh);
+        if (fast.speed_kmh <= strategy.reserve_slow_kmh || stored_wh - fast.energy.net_wh() >= target_wh) return fast;
+        if (fast.speed_kmh > strategy.reserve_medium_kmh) {
+            const auto medium = evaluate(strategy.reserve_medium_kmh);
+            if (stored_wh - medium.energy.net_wh() >= target_wh) return medium;
+        }
+        return evaluate(strategy.reserve_slow_kmh);
     }
     }
     throw std::invalid_argument("unknown policy");
@@ -97,13 +141,79 @@ std::vector<Weather> draw_weather(std::span<const Leg> route, std::mt19937_64& r
     return result;
 }
 
+std::vector<double> detail::prepare_race(std::span<const Leg> route, const Config& config, bool plan_reserve) {
+    if (route.empty() || !std::isfinite(config.capacity_wh) || config.capacity_wh <= 0.0 ||
+        !fraction(config.start_soc) || !fraction(config.reserve_soc) || !config.energy_model ||
+        !std::isfinite(config.parked_clear_sky_wh_m2) || config.parked_clear_sky_wh_m2 < 0.0) {
+        throw std::invalid_argument("invalid route or storage configuration");
+    }
+    const auto& strategy = config.strategy;
+    const auto valid_speed = [](double speed) { return speed >= 20.0 && speed <= 140.0; };
+    if (!valid_speed(strategy.steady_kmh) || !valid_speed(strategy.push_kmh) ||
+        !valid_speed(strategy.reserve_fast_kmh) || !valid_speed(strategy.reserve_medium_kmh) ||
+        !valid_speed(strategy.reserve_slow_kmh) || strategy.reserve_fast_kmh < strategy.reserve_slow_kmh ||
+        !fraction(strategy.reserve_target_soc) ||
+        (strategy.reserve_strategy == ReserveStrategy::tiers &&
+         (strategy.reserve_fast_kmh < strategy.reserve_medium_kmh || strategy.reserve_medium_kmh < strategy.reserve_slow_kmh))) {
+        throw std::invalid_argument("strategy needs speeds from 20 to 140 km/h, ordered reserve tiers and a valid target");
+    }
+    const auto& adjustments = config.weather_adjustments;
+    if (!(adjustments.solar_multiplier >= 0.0 && adjustments.solar_multiplier <= 2.0) ||
+        !(std::abs(adjustments.headwind_offset_mps) <= 25.0)) {
+        throw std::invalid_argument("weather needs a solar multiplier from 0 to 2 and wind offset within ±25 m/s");
+    }
+    if (config.race_schedule && std::ranges::any_of(route, [](const Leg& leg) {
+        return !std::isfinite(leg.control_minutes) || leg.control_minutes < 0.0;
+    })) {
+        throw std::invalid_argument("invalid control stop duration");
+    }
+    if (strategy.reserve_strategy == ReserveStrategy::tiers) return {};
+    if (strategy.reserve_strategy != ReserveStrategy::energy_envelope) {
+        throw std::invalid_argument("unknown reserve strategy");
+    }
+
+    if (!plan_reserve) return {};
+    const auto forecast = adjusted_weather({.70, 3.0, 1.0, .65}, adjustments);
+    const double overnight_credit = parked_generation(config, forecast);
+    const double floor = config.capacity_wh * std::max(config.reserve_soc, strategy.reserve_target_soc);
+    std::vector<double> arrival_targets(route.size());
+    double required_departure = floor;
+    for (std::size_t index = route.size(); index-- > 0;) {
+        const auto& leg = route[index];
+        const bool final = index + 1 == route.size();
+        const bool overnight = finishes_stage(route, index);
+        const double charge = overnight && required_departure <= config.capacity_wh ? overnight_credit : 0.0;
+        arrival_targets[index] = std::max(floor, required_departure - charge);
+        // Entry speed at an ordinary waypoint is approximated by the candidate cruise speed.
+        const bool standing = index == 0 || finishes_stage(route, index - 1) ||
+                              control_stop(route[index - 1], config, false);
+        const bool stop = final || overnight || control_stop(leg, config, false);
+        const auto speeds = pace_grid(strategy, leg.pace_cap_kmh);
+        const auto net_draw = [&](double speed) {
+            return leg_energy(config, leg, forecast, standing ? 0.0 : speed, speed, stop).net_wh();
+        };
+        // The first leg has no earlier waypoint requiring its departure target.
+        if (index == 0) break;
+        double minimum = net_draw(speeds.front());
+        if (speeds.front() != speeds.back()) {
+            for (double speed : std::span(speeds).subspan(1)) minimum = std::min(minimum, net_draw(speed));
+        }
+        required_departure = std::max(floor, arrival_targets[index] + minimum);
+        if (!std::isfinite(required_departure)) throw std::overflow_error("route energy envelope exceeded numeric range");
+    }
+    return arrival_targets;
+}
+
 Result simulate(std::span<const Leg> route, std::span<const Weather> weather, const Config& config,
                 Policy policy, const LegSink& trace) {
-    if (route.empty() || route.size() != weather.size() || !std::isfinite(config.capacity_wh) ||
-        config.capacity_wh <= 0.0 || !fraction(config.start_soc) || !fraction(config.reserve_soc) || !config.energy_model ||
-        !std::isfinite(config.parked_clear_sky_wh_m2) || config.parked_clear_sky_wh_m2 < 0.0) {
-        throw std::invalid_argument("invalid route, weather length or storage configuration");
-    }
+    const auto targets = detail::prepare_race(route, config, policy == Policy::reserve_first);
+    return detail::simulate_prepared(route, weather, config, policy, targets, trace);
+}
+
+Result detail::simulate_prepared(std::span<const Leg> route, std::span<const Weather> weather,
+                                 const Config& config, Policy policy, std::span<const double> arrival_targets,
+                                 const LegSink& trace) {
+    if (route.size() != weather.size()) throw std::invalid_argument("weather must cover every leg");
 
     Result result;
     double stored_wh = config.capacity_wh * config.start_soc;
@@ -118,27 +228,24 @@ Result simulate(std::span<const Leg> route, std::span<const Weather> weather, co
 
     for (std::size_t index = 0; index < route.size(); ++index) {
         const auto& leg = route[index];
-        const auto& conditions = weather[index];
+        const auto conditions = adjusted_weather(weather[index], config.weather_adjustments);
         const bool new_day = index > 0 && leg.day != route[index - 1].day;
         const bool final_leg = index + 1 == route.size();
-        const bool overnight = !final_leg && leg.day != route[index + 1].day;
-        const bool control_stop = config.race_schedule && !final_leg && leg.control_minutes > 0.0;
-        if (config.race_schedule && (!std::isfinite(leg.control_minutes) || leg.control_minutes < 0.0)) {
-            throw std::invalid_argument("invalid control stop duration");
-        }
-        const bool stop_at_end = final_leg || overnight || control_stop;
+        const bool overnight = finishes_stage(route, index);
+        const bool hold = control_stop(leg, config, final_leg);
+        const bool stop_at_end = final_leg || overnight || hold;
         const double spilled_before = result.spilled_wh;
         double parked_wh = 0.0;
         if (new_day) {
-            // A one-hour equivalent irradiance gives the prescribed Wh/m^2 exposure.
-            parked_wh = ecm::solar_energy_wh(
-                config.array, config.parked_clear_sky_wh_m2 * conditions.park_solar_factor, 3600.0);
+            parked_wh = parked_generation(config, conditions);
             result.solar_wh += parked_wh;
             store(parked_wh);
         }
         const double depart_wh = stored_wh;
         const double race_depart = result.race_hours;
-        const auto [speed, energy] = pace_leg(config, leg, conditions, policy, stored_wh, entry_kmh, stop_at_end);
+        const auto target = policy == Policy::reserve_first && !arrival_targets.empty()
+            ? std::optional{arrival_targets[index]} : std::nullopt;
+        const auto [speed, energy] = pace_leg(config, leg, conditions, policy, stored_wh, entry_kmh, stop_at_end, target);
         const bool depleted = energy.net_wh() > stored_wh;
         // With constant average net draw within a leg, range until depletion is linear.
         const double portion = depleted ? stored_wh / energy.net_wh() : 1.0;
@@ -146,7 +253,7 @@ Result simulate(std::span<const Leg> route, std::span<const Weather> weather, co
         const double driving = energy.seconds * portion / 3600.0;
         result.drive_hours += driving;
         const double race_arrive = race_depart + driving;
-        const double control = control_stop && !depleted ? leg.control_minutes / 60.0 : 0.0;
+        const double control = hold && !depleted ? leg.control_minutes / 60.0 : 0.0;
         const double race_after_control = race_arrive + control;
         const double off_duty = config.race_schedule && overnight && !depleted
             ? std::max(0.0, 24.0 * (route[index + 1].day - 1) - race_after_control) : 0.0;
@@ -166,7 +273,9 @@ Result simulate(std::span<const Leg> route, std::span<const Weather> weather, co
                    energy.solar_wh * portion, energy.demand_wh * portion, parked_wh, depleted,
                    result.drive_hours, depart_wh / config.capacity_wh, result.spilled_wh - spilled_before,
                    leg.clear_sky_w_m2 * conditions.solar_factor, components,
-                   race_depart, race_arrive, control, off_duty});
+                   race_depart, race_arrive, control, off_duty,
+                   portion > 0.0 ? leg.distance_km / (energy.seconds / 3600.0) : 0.0,
+                   target ? std::optional{*target / config.capacity_wh} : std::nullopt});
         }
         if (depleted) {
             result.completed = false;

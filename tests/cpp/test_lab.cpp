@@ -58,6 +58,45 @@ int main() {
     near(scheduled.race_hours, timetable.back().race_arrive_hours, "race duration ends at final arrival");
     check(scheduled.race_hours > scheduled.drive_hours, "elapsed race time includes holds and waits");
 
+    const std::array planning_route{
+        Leg{1, "Midpoint", 10.0, 0.0, 0.0, 100.0},
+        Leg{1, "Finish", 15.0, 0.0, 0.0, 90.0},
+    };
+    const std::array calm{Weather{0.5, 0.0, 1.0, 0.5}, Weather{0.5, 0.0, 1.0, 0.5}};
+    Config planning;
+    planning.capacity_wh = 100.0;
+    planning.start_soc = .9;
+    planning.strategy = {67.0, 120.0, 100.0, 70.0, 40.0, .2, ReserveStrategy::energy_envelope};
+    planning.energy_model = [](const ecm_cont::RouteInput& input, const ecm::VehicleParams&,
+                               const ecm::Drivetrain&, const ecm::SolarArray&) {
+        const double speed = input.road.cruise_speed_mps;
+        const double draw = input.road.distance_m / 1000.0 * speed * 3.6 / 20.0;
+        return ecm_cont::RouteEnergy{input.road.distance_m / speed, draw, 0.0};
+    };
+    std::vector<LegObservation> plan;
+    const auto planned = simulate(planning_route, calm, planning, Policy::reserve_first,
+                                  [&](const LegObservation& leg) { plan.push_back(leg); });
+    check(planned.completed && plan.size() == 2, "envelope completes the analytic route");
+    near(*plan[0].planned_arrival_soc, .5, "arrival target includes the remaining leg's minimum draw");
+    near(*plan.back().planned_arrival_soc, .2, "finish target equals the configured reserve");
+    near(plan[0].cruise_kmh, 77.5, "envelope picks the fastest grid point meeting the target");
+    near(plan[0].mean_speed_kmh, 77.5, "trace includes true leg mean speed");
+    near(plan[1].cruise_kmh, 40.0, "controller preserves terminal charge with the lower bound");
+    check(planned.finish_soc >= .2, "envelope meets the terminal target");
+    const auto fixed = simulate(planning_route, calm, planning, Policy::push,
+                                [](const LegObservation& leg) {
+        check(!leg.planned_arrival_soc, "fixed pacing does not use the envelope");
+        if (leg.leg == 0) near(leg.cruise_kmh, 100.0, "configured target respects the route cap");
+    });
+    check(!fixed.completed, "the aggressive policy overdraws the test pack");
+    planning.weather_adjustments = {.5, -2.0};
+    const auto stress = simulate(planning_route, calm, planning, Policy::steady, [](const LegObservation& leg) {
+        near(leg.weather.solar_factor, .25, "scenario changes the sampled solar fraction");
+        near(leg.weather.headwind_mps, -2.0, "scenario offsets signed wind");
+    });
+
+    check(stress.completed, "weather-adjusted run reaches the finish");
+
     const auto residuals = synthetic_weather_residuals();
     const auto forecast = calibrate_forecast(residuals, 2025);
     const auto rerun = calibrate_forecast(residuals, 2025);
