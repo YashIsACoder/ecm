@@ -1,0 +1,4 @@
+"day","destination","distance_km","grade_pct","clear_sky_w_m2","pace_cap_kmh"
+1,Example lookout,10,0.2,750,90
+1,"Example, ""roadhouse""",15,-0.2,800,90
+2,Example finish,20,0,830,85

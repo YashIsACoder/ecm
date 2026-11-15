@@ -1,0 +1,34 @@
+name: Simulator build
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: simulator
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: YashIsACoder/ecm
+          ref: ed4642439b28a52c2a19e566d40d20b7fc11297c
+          path: ecm
+          token: ${{ secrets.ECM_READ_TOKEN }}
+          persist-credentials: false
+      - working-directory: simulator
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel
+          ctest --test-dir build --output-on-failure
+          python3 -m unittest discover -s tests -p 'test_*.py'
+          ./build/solar-race --trials 8 --seed 42 --pack-kwh 4.5 > trials.csv
+          python3 analysis/analyse.py trials.csv
+          python3 analysis/run_matrix.py build/solar-race --route tests/route.csv --trials 3 --out matrix
