@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Forecast methods · Sunswift Route Lab</title>
+  <link rel="stylesheet" href="./lab.css">
+  <script src="./methods.mjs" type="module"></script>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="./"><span class="mark" aria-hidden="true"></span>ECM / SUNSWIFT ROUTE LAB</a>
+    <nav aria-label="Pages"><a href="./">Race control <span aria-hidden="true">↗</span></a></nav>
+  </header>
+  <main class="methods">
+    <div class="intro">
+      <div>
+        <h1>Forecast methods</h1>
+        <p>Estimate weather bias with MCMC, draw a correlated route forecast, then race each strategy through the same conditions.</p>
+      </div>
+    </div>
+    <section class="method-panel" aria-labelledby="chains-heading">
+      <div class="section-head">
+        <div>
+          <p class="readout" id="run-meta" role="status">Loading C++ calibration…</p>
+          <h2 id="chains-heading">Inside the sampler</h2>
+        </div>
+        <div id="feature-switch" class="feature-switch" role="group" aria-label="Weather parameter">
+          <button type="button" data-feature="solar" aria-pressed="true">Solar bias</button>
+          <button type="button" data-feature="wind" aria-pressed="false">Wind bias</button>
+        </div>
+      </div>
+      <p id="feature-description"></p>
+      <div class="chain-chart">
+        <canvas id="chain-trace" role="img" aria-label="Trace of four chains with the exact posterior mean and the selected iteration marked."></canvas>
+      </div>
+      <div class="chain-scrub">
+        <label for="sample">Inspect retained iteration</label>
+        <input id="sample" type="range" min="0" max="0" value="0" disabled>
+        <output id="sample-number" for="sample"></output>
+      </div>
+      <div class="chain-stats" id="chain-stats" aria-label="Per-chain diagnostics"></div>
+      <dl class="posterior-stats">
+        <div><dt>Sampled mean ± SD</dt><dd id="sampled"></dd></div>
+        <div><dt>Exact mean ± SD</dt><dd id="exact"></dd></div>
+        <div><dt>Classical split R̂</dt><dd id="rhat"></dd></div>
+      </dl>
+    </section>
+    <section class="method-grid" aria-label="Simulation algorithms">
+      <article class="method-panel">
+        <h2>Calibrate the bias</h2>
+        <p>Twelve synthetic residual pairs represent measured minus reference irradiance factors and signed wind. Each bias has a zero-mean Gaussian prior and a Gaussian residual likelihood. Solar prior and observation SDs are 0.18 and 0.13. Wind SDs are 3.0 and 1.8 m/s.</p>
+        <code>log α = min(0, log p(candidate | data) − log p(current | data))</code>
+        <p>Four overdispersed chains run random-walk Metropolis with symmetric Gaussian steps. Each discards 400 warm-up iterations and retains 1,600. The exact conjugate posterior supplies proposal scales and a reference for the sampler. Split R̂ compares variation within and between split chains.</p>
+      </article>
+      <article class="method-panel">
+        <h2>Draw a route forecast</h2>
+        <p>Each race trial resamples one joint bias state with replacement. Stationary AR(1) processes add day-level and leg-level variation to cloud attenuation and signed headwind. This lets nearby legs share weather while each day can differ.</p>
+        <code>xₜ = ρ xₜ₋₁ + √(1 − ρ²) εₜ, εₜ ∼ N(0, 1)</code>
+        <p>Day persistence is 0.55 and leg persistence is 0.72. Driving solar is the route's clear-sky scenario times the bounded attenuation factor. Replay telemetry shows each active leg's forecast and switches when that car enters a new leg.</p>
+      </article>
+      <article class="method-panel">
+        <h2>Replay control stops</h2>
+        <p>The native engine timestamps departure, arrival, control release and overnight departure. Every strategy starts at 08:00 on the model clock. Marked controls hold the car for 30 minutes. Route day boundaries park it until the next scheduled 08:00.</p>
+        <p>The chart connects recorded leg endpoints. Overnight charge represents the next day's aggregate parked-solar credit. Control holds carry no solar credit in this model.</p>
+      </article>
+      <article class="method-panel">
+        <h2>Compare racing policies</h2>
+        <p>Each draw feeds the same wind, solar and rolling conditions to three pacing policies. The chosen ECM variant computes aerodynamic drag, rolling loss, grade, kinetic energy, drivetrain losses, regeneration and auxiliary load.</p>
+        <p>Finish and reserve rates use 95% Wilson intervals. Differences from Steady use paired Newcombe intervals. The intervals quantify Monte Carlo sampling error under the simulated conditions.</p>
+      </article>
+    </section>
+    <footer class="method-sources">
+      <a href="https://doi.org/10.1093/biomet/57.1.97">Hastings' sampling method</a>
+      <a href="https://mc-stan.org/docs/2_40/reference-manual/analysis.html">Chain diagnostics</a>
+      <a href="https://worldsolarchallenge.org/files/3297_2025_bwsc_regulations_release_v20_published_28_october_2024.pdf">2025 BWSC regulations, §3.27</a>
+    </footer>
+  </main>
+</body>
+</html>

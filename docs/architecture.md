@@ -27,7 +27,7 @@ flowchart LR
 | `include/ecm_cont`, `src/continuous` | Continuous drive cycles, integration, and route estimator adapters |
 | `src/detail` | Shared internal validation and unit conventions |
 | `bindings/python` | pybind11 bindings for the C++ library |
-| `include/ecm/lab.hpp`, `src/lab` | Reusable route parser, scenario presets, policy engine, and paired Monte Carlo driver |
+| `include/ecm/lab.hpp`, `include/ecm/forecast.hpp`, `src/lab` | Route parser, scheduled policy engine, weather calibration and paired Monte Carlo driver |
 | `apps/route-lab` | Command-line client, Python analysis, local browser adapter and standalone replay assets |
 | `tests` | Native model tests, Python binding tests, and an installed-package consumer |
 
@@ -41,9 +41,9 @@ plus package metadata.
 ## Simulation flow
 
 1. Parse each route leg into distance, fractional grade, irradiance and cruise cap. Select the vehicle preset and ECM backend.
-2. Draw the weather once for each trial. Run all pacing rules on that draw so differences can be paired.
+2. Select the baseline weather generator or calibrate a posterior once per experiment. Draw weather once for each trial and pass it to every policy. [Forecast model](../apps/route-lab/docs/forecast.md)
 3. Call the selected estimator with the state-independent inputs for each candidate pace. It returns seconds, signed DC demand and solar generation. Reuse the chosen estimate for the battery update.
-4. Apply capacity, reserve and depletion rules in the lab. Emit one CSV row per trial and pacing rule.
+4. Apply capacity, reserve, depletion and optional control schedules in the lab. Emit one CSV row per trial and pacing rule.
 5. Run the same seed across vehicle and model cases. Python validates trial IDs, pairs equivalent rows, and records the input and executable hashes.
 
 The library uses metres, seconds, m/s, fractional grade and watt-hours at the
@@ -53,18 +53,21 @@ calling ECM. The sign convention is positive DC demand and positive solar
 generation, with net draw equal to demand minus generation.
 
 The CLI streams results and keeps one trial's weather and battery state in
-memory. Runtime grows with the number of trials, policies, legs and estimator
+memory. Posterior mode also retains a fixed four-chain calibration for the
+experiment. Runtime grows with the number of trials, policies, legs and estimator
 work. The experiment runner retains parsed cases for pairing. Seeded results
 are repeatable on the same build. Standard-library normal draws can differ
 across toolchains.
 
 The local browser adapter runs the CLI with bounded trial counts and sends the
 same results and one native leg trace to the frontend. The browser interpolates
-the cars' positions and battery charge between native leg observations on a
-shared driving-time clock. It displays native wheel and DC changes, and reports
-confidence intervals for finish and reserve outcomes. The homepage build reads a
-recorded native JSON result with route and binary hashes. It uses the same
-replay controls and can be served directly from a static site.
+the cars' positions and battery charge between native leg observations, using
+the native race clock for starts, control holds and overnight parking. Weather
+readouts switch as the selected strategy enters each leg. The browser displays
+wheel and DC changes and reports confidence intervals for finish and reserve
+outcomes. The homepage build uses the same replay controls and reads a recorded
+native result with route and binary hashes. The methods page reads a separate
+CLI calibration report. Both pages can be served from a static site.
 
 ## Extension points
 

@@ -30,11 +30,14 @@ ASSETS = {
     "/lab.mjs": ("lab.mjs", "text/javascript; charset=utf-8"),
     "/map-data.mjs": ("map-data.mjs", "text/javascript; charset=utf-8"),
     "/replay.mjs": ("replay.mjs", "text/javascript; charset=utf-8"),
+    "/methods.html": ("methods.html", "text/html; charset=utf-8"),
+    "/methods.mjs": ("methods.mjs", "text/javascript; charset=utf-8"),
+    "/forecast-demo.json": ("forecast-demo.json", "application/json"),
     "/demo.json": ("demo.json", "application/json"),
 }
 MAX_TRIALS = 3000
 DEMO = {"route": "outback", "vehicle": "sr7", "model": "mapped", "trials": 500,
-        "seed": "2025", "trace_trial": 6, "pack_kwh": None}
+        "seed": "2025", "trace_trial": 15, "pack_kwh": None, "weather": "posterior"}
 
 
 def experiment_arguments(request: dict) -> tuple[list[str], Path, int]:
@@ -45,6 +48,9 @@ def experiment_arguments(request: dict) -> tuple[list[str], Path, int]:
         raise ValueError("Choose one of the supplied routes.")
     if vehicle not in ("sr7", "sr8", "reference") or model not in ("segment", "cycle", "mapped"):
         raise ValueError("Choose a supported vehicle and ECM model.")
+    weather = request.get("weather", "posterior")
+    if weather not in ("baseline", "posterior"):
+        raise ValueError("Choose a supported weather model.")
     trials = request.get("trials")
     if type(trials) is not int or not 1 <= trials <= MAX_TRIALS:
         raise ValueError(f"Trial count must be an integer from 1 to {MAX_TRIALS:,}.")
@@ -56,7 +62,7 @@ def experiment_arguments(request: dict) -> tuple[list[str], Path, int]:
         raise ValueError("Seed must be a nonnegative 64-bit integer.")
     path = ROUTES / ROUTE_FILES[route]
     args = ["--route", str(path), "--vehicle", vehicle, "--model", model, "--trials", str(trials),
-            "--seed", seed, "--trace-trial", str(trace)]
+            "--seed", seed, "--trace-trial", str(trace), "--weather", weather, "--race-schedule"]
     pack = request.get("pack_kwh")
     if pack is not None:
         if type(pack) not in (int, float) or pack <= 0 or not math.isfinite(pack * 1000.0):
@@ -72,7 +78,7 @@ def run_case(executable: Path, request: dict) -> dict:
     checkpoints = list(accumulate(float(leg["distance_km"]) for leg in route_rows))
     route_points = [
         {"day": int(leg["day"]), "name": leg["destination"], "km": km, "grade_pct": float(leg["grade_pct"]),
-         "pace_cap_kmh": float(leg["pace_cap_kmh"])}
+         "pace_cap_kmh": float(leg["pace_cap_kmh"]), "control_minutes": float(leg.get("control_minutes", 0))}
         for leg, km in zip(route_rows, checkpoints)
     ]
     length = checkpoints[-1]
@@ -86,6 +92,9 @@ def run_case(executable: Path, request: dict) -> dict:
     for name in POLICIES:
         trials = [trial[name] for trial in cases.values()]
         times = [trial.drive_hours for trial in trials if trial.completed]
+        if any(trial.race_hours is None for trial in trials):
+            raise RuntimeError("The simulator omitted scheduled race times.")
+        race_times = [trial.race_hours for trial in trials if trial.completed]
         lengths = sorted(trial.distance_km for trial in trials if trial.distance_km is not None)
         if len(lengths) != count:
             raise RuntimeError("The simulator omitted route distances.")
@@ -102,6 +111,7 @@ def run_case(executable: Path, request: dict) -> dict:
             "name": name, "finishes": len(times), "completion_ci": wilson(len(times), count),
             "reserve_breaches": breaches, "reserve_ci": wilson(breaches, count),
             "median_hours": statistics.median(times) if times else None,
+            "median_race_hours": statistics.median(race_times) if race_times else None,
             "route_reach": reached, "diagnostics": {"distance_km": statistics.median(lengths), **metrics},
         })
     comparisons = {
@@ -122,11 +132,21 @@ def run_case(executable: Path, request: dict) -> dict:
         if leg != len(logs[name]) or leg >= len(route_points):
             raise ValueError("Unexpected route index in the native leg trace.")
         observation = {key: float(value) if value else None for key, value in row.items()}
-        previous = logs[name][-1] if leg else {"elapsed_hours": 0.0, "distance_km": 0.0}
+        previous = logs[name][-1] if leg else {"elapsed_hours": 0.0, "distance_km": 0.0,
+                                                "race_arrive_hours": 0.0, "control_hours": 0.0,
+                                                "overnight_hours": 0.0}
         if (not all(value is None or math.isfinite(value) for value in observation.values()) or
                 any(observation[key] is None or observation[key] < previous[key]
                     for key in ("elapsed_hours", "distance_km"))):
             raise ValueError("Invalid driving time or distance in the native trace.")
+        depart = observation["race_depart_hours"]
+        arrive = observation["race_arrive_hours"]
+        release = previous["race_arrive_hours"] + previous["control_hours"] + previous["overnight_hours"]
+        # Native CSV fields round independently to six decimal places.
+        if (depart is None or arrive is None or arrive < depart or
+                not math.isclose(depart, release, rel_tol=0, abs_tol=3e-6) or
+                any(observation[key] is None or observation[key] < 0 for key in ("control_hours", "overnight_hours"))):
+            raise ValueError("Invalid race schedule in the native trace.")
         logs[name].append({"leg": leg, **observation})
     if any(not events for events in logs.values()):
         raise ValueError("The native simulator omitted the requested leg trace.")

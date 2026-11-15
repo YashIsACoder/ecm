@@ -1,7 +1,7 @@
 "use strict";
 
 import { routes } from "./map-data.mjs";
-import { drawBattery, drawRouteMap, policyStyles, traceAt } from "./replay.mjs";
+import { drawBattery, drawRouteMap, playbackTimeline, policyStyles, raceClock, traceAt, translateTime } from "./replay.mjs";
 
 const form = document.querySelector("#experiment");
 const run = document.querySelector("#run");
@@ -18,6 +18,15 @@ const runInputs = document.querySelector("#run-inputs");
 const runNote = document.querySelector("#input-note");
 const replay = document.querySelector("#replay");
 const play = document.querySelector("#play");
+const nextRest = document.querySelector("#next-rest");
+const raceDay = document.querySelector("#race-day");
+const clockDisplay = document.querySelector("#race-clock");
+const activePolicy = document.querySelector("#active-policy");
+const phaseDisplay = document.querySelector("#race-phase");
+const placeDisplay = document.querySelector("#race-place");
+const solarDisplay = document.querySelector("#race-solar");
+const cloudDisplay = document.querySelector("#race-cloud");
+const windDisplay = document.querySelector("#race-wind");
 const leg = document.querySelector("#leg");
 const legLabel = document.querySelector("#leg-label");
 const drawLabel = document.querySelector("#draw-label");
@@ -45,6 +54,8 @@ let current;
 let busy = false;
 let timer;
 let historyKey;
+let timeline;
+const phaseLabels = { drive: "On course", control: "REST", overnight: "Parked", finish: "Finished", depleted: "Depleted" };
 
 const percent = (value) => `${(100 * value).toFixed(1)}%`;
 const pointDelta = (value) => {
@@ -85,7 +96,8 @@ function render(data, settings, recorded = false) {
     const row = namedRow(summary, policy.name);
     addCell(row, percent(policy.finishes / data.trials), policy.completion_ci.map(percent).join("–"));
     addCell(row, percent(policy.reserve_breaches / data.trials), policy.reserve_ci.map(percent).join("–"));
-    addCell(row, policy.median_hours === null ? "—" : `${policy.median_hours.toFixed(2)} h`);
+    addCell(row, policy.median_race_hours === null ? "—" : `${policy.median_race_hours.toFixed(2)} h`,
+      policy.median_hours === null ? "" : `${policy.median_hours.toFixed(2)} h driving`);
     const metrics = policy.diagnostics;
     const diagnosticRow = namedRow(diagnostics, policy.name);
     addCell(diagnosticRow, `${numbers.format(metrics.distance_km)} km`);
@@ -177,10 +189,13 @@ function resetReplay() {
   mapHeading.textContent = mapRoute.title;
   mapKind.textContent = mapRoute.geographic ? "CORRIDOR MAP" : "SCHEMATIC";
   mapCaption.textContent = mapRoute.geographic
-    ? "Approximate checkpoints on the synthetic course. Coastline by Natural Earth."
-    : "Illustrative layout for the fictional rolling-country route.";
+    ? "Gold markers indicate control stops. Approximate route geometry. Coastline by Natural Earth."
+    : "Gold markers indicate control stops on this fictional route.";
   drawLabel.textContent = `DRAW ${draw} OF ${numbers.format(current.trials)}`;
-  leg.max = Math.max(1e-6, ...Object.values(logs).map((events) => events.at(-1).elapsed_hours));
+  timeline = playbackTimeline(logs);
+  leg.max = timeline.at(-1).hour;
+  leg.disabled = Number(leg.max) === 0;
+  play.disabled = leg.disabled;
   leg.value = 0;
   readouts.replaceChildren();
   for (const name of Object.keys(labels)) {
@@ -209,20 +224,53 @@ function renderReplay() {
   const positions = Object.fromEntries(
     Object.entries(current.trace.logs).map(([name, events]) => [name, traceAt(events, hour)]),
   );
-  legLabel.textContent = `${hour.toFixed(1)} / ${horizon.toFixed(1)} driving h`;
-  leg.setAttribute("aria-valuetext", legLabel.textContent);
+  const { day, clock, night } = raceClock(hour);
+  raceDay.textContent = `Day ${day}`;
+  clockDisplay.textContent = clock;
+  legLabel.textContent = `${hour.toFixed(1)} / ${horizon.toFixed(1)} h`;
+  leg.setAttribute("aria-valuetext", `Day ${day}, ${clock}. ${hour.toFixed(1)} race hours elapsed.`);
+  renderTelemetry(selected, positions[selected]);
+  nextRest.disabled = !nextControlHour();
   for (const row of readouts.children) {
     const state = positions[row.dataset.policy];
     row.setAttribute("aria-pressed", String(row.dataset.policy === selected));
     const charge = state.depleted ? "depleted" : `${state.soc.toFixed(0)}% SOC`;
-    row.lastElementChild.textContent = `${numbers.format(state.distance)} km · ${charge}${state.done && !state.depleted ? " · finished" : ""}`;
+    row.lastElementChild.textContent = `${numbers.format(state.distance)} km · ${charge} · ${phaseLabels[state.phase]}`;
   }
-  drawRouteMap(map, current.trace, positions, selected);
-  drawBattery(battery, current.trace.logs, hour, horizon, positions);
+  drawRouteMap(map, current.trace, positions, selected, night);
+  drawBattery(battery, current.trace.logs, hour, Math.max(horizon, 1e-6), positions);
   const key = `${selected}-${positions[selected].reached}`;
   if (key === historyKey) return;
   historyKey = key;
   renderHistory(current.trace, selected, positions[selected].reached);
+}
+
+function nextControlHour() {
+  return current.trace.logs[logPolicy.value].find((event) =>
+    event.control_hours > 0 && event.race_arrive_hours > Number(leg.value) + 1e-6,
+  )?.race_arrive_hours;
+}
+
+function renderTelemetry(policy, { event, phase, restRemaining }) {
+  const place = current.trace.points[event.leg].name;
+  activePolicy.textContent = labels[policy];
+  phaseDisplay.textContent = phaseLabels[phase];
+  phaseDisplay.dataset.phase = phase;
+  const remaining = Math.max(0, Math.ceil((restRemaining ?? 0) * 60 - 1e-4));
+  const reasons = {
+    drive: `Toward ${place} · ${event.speed_kmh.toFixed(0)} km/h target`,
+    control: `${place} control · ${remaining} min until release`,
+    overnight: `${place} · departure at ${raceClock(Number(leg.value) + (restRemaining ?? 0) + 1e-6).clock}`,
+    finish: `Finished at ${place}`,
+    depleted: `Battery depleted before ${place}`,
+  };
+  placeDisplay.textContent = reasons[phase];
+  const weatherAvailable = phase === "drive" || phase === "control";
+  solarDisplay.textContent = weatherAvailable ? `${event.irradiance_w_m2.toFixed(0)} W/m²` : "—";
+  cloudDisplay.textContent = weatherAvailable ? percent(event.solar_factor) : "—";
+  const wind = event.headwind_mps;
+  windDisplay.textContent = weatherAvailable
+    ? `${Math.abs(wind).toFixed(1)} m/s ${wind < 0 ? "tail" : "head"}` : "—";
 }
 
 function renderHistory({ points, logs }, selected, count) {
@@ -239,7 +287,10 @@ function renderHistory({ points, logs }, selected, count) {
     const item = document.createElement("li");
     item.classList.toggle("depleted", Boolean(event.depleted));
     const heading = document.createElement("strong");
-    heading.textContent = `${event.elapsed_hours.toFixed(2)} h · Day ${point.day} · ${event.depleted ? "Stopped before " : ""}${point.name}`;
+    const { day, clock } = raceClock(event.race_arrive_hours);
+    const stop = event.control_hours ? ` · REST ${Math.round(event.control_hours * 60)} min` : "";
+    const night = event.overnight_hours ? ` · overnight ${event.overnight_hours.toFixed(1)} h` : "";
+    heading.textContent = `Day ${day} ${clock} · ${event.depleted ? "Stopped before " : ""}${point.name}${stop}${night}`;
     const details = document.createElement("span");
     const parked = event.parked_wh ? ` · parked solar ${(event.parked_wh / 1000).toFixed(2)} kWh` : "";
     details.textContent = `${event.speed_kmh.toFixed(0)} km/h target · ${event.soc_pct.toFixed(1)}% SOC · ` +
@@ -317,13 +368,13 @@ function toggleReplay() {
   }
   play.textContent = "Pause replay";
   const start = performance.now();
-  const from = Number(leg.value);
-  const end = Number(leg.max);
+  const offset = translateTime(timeline, Number(leg.value), "hour", "offset");
+  const end = timeline.at(-1);
   const advance = (now) => {
-    const hours = Math.min(end, from + (now - start) * end / 20_000);
-    leg.value = hours;
+    const to = Math.min(end.offset, offset + (now - start) * end.offset / 32_000);
+    leg.value = translateTime(timeline, to, "offset", "hour");
     renderReplay();
-    if (hours === end) {
+    if (to === end.offset) {
       pauseReplay();
     } else {
       timer = requestAnimationFrame(advance);
@@ -421,6 +472,13 @@ document.querySelector("#download-trace").addEventListener("click", () => {
   downloadCsv(current.trace.csv, `solar-race-draw-${current.trace.draw}.csv`);
 });
 play.addEventListener("click", toggleReplay);
+nextRest.addEventListener("click", () => {
+  const hour = nextControlHour();
+  if (hour === undefined) return;
+  pauseReplay();
+  leg.value = hour;
+  renderReplay();
+});
 leg.addEventListener("input", () => {
   pauseReplay();
   renderReplay();

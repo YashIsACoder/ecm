@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+import math
 import subprocess
 import sys
 from pathlib import Path
@@ -16,18 +17,25 @@ def main() -> None:
             url = server.stdout.readline().strip().rsplit(" ", 1)[-1]
             assert url.startswith("http://127.0.0.1:")
             with urlopen(url, timeout=5) as page:
-                assert "Replay a shared weather draw" in page.read().decode()
+                assert "Race control" in page.read().decode()
             with urlopen(url + "/?replay=1", timeout=5) as page:
                 assert page.status == 200
             with urlopen(url + "/demo.json", timeout=5) as response:
                 demo = json.load(response)["result"]
-                assert demo["trace"]["draw"] == 6 and demo["trace"]["route"] == "outback"
-                assert "elapsed_hours" in demo["trace"]["logs"]["steady"][0]
+                assert demo["trace"]["draw"] == 15 and demo["trace"]["route"] == "outback"
+                assert "race_arrive_hours" in demo["trace"]["logs"]["steady"][0]
+                assert any(event["control_hours"] == 0.5 for event in demo["trace"]["logs"]["steady"])
+            with urlopen(url + "/methods.html", timeout=5) as methods:
+                assert "Inside the sampler" in methods.read().decode()
+            with urlopen(url + "/forecast-demo.json", timeout=5) as response:
+                forecast = json.load(response)
+                assert forecast["retained_per_chain"] == 1600 and forecast["plot_stride"] == 8
+                assert len(forecast["features"]["solar"]["chains"]) == 4
             with urlopen(url + "/replay.mjs", timeout=5) as asset:
                 assert asset.headers.get_content_type() == "text/javascript"
 
             request = {"route": "rolling", "vehicle": "sr8", "model": "mapped",
-                       "trials": 8, "seed": "42", "trace_trial": 3}
+                       "trials": 8, "seed": "42", "trace_trial": 3, "weather": "posterior"}
             data = json.dumps(request).encode()
             with urlopen(Request(url + "/api/run", data, {"Content-Type": "application/json"}), timeout=10) as response:
                 result = json.load(response)
@@ -42,6 +50,16 @@ def main() -> None:
             trace = result["trace"]["logs"]["steady"][0]
             assert abs(trace["traction_wh"] + trace["auxiliary_wh"] - trace["demand_wh"]) < 3e-6
             assert trace["elapsed_hours"] > 0 and trace["rolling_wh"] > 0
+            events = result["trace"]["logs"]["steady"]
+            held, *_ = [event for event in events if event["control_hours"] == 0.5]
+            assert math.isclose(events[held["leg"] + 1]["race_depart_hours"],
+                                held["race_arrive_hours"] + 0.5, rel_tol=0, abs_tol=2e-6)
+            assert any(event["race_depart_hours"] == 24 for event in events)
+            request["weather"] = "baseline"
+            baseline = Request(url + "/api/run", json.dumps(request).encode(), {"Content-Type": "application/json"})
+            with urlopen(baseline, timeout=10) as response:
+                baseline_trace = json.load(response)["trace"]["logs"]["steady"][0]
+            assert baseline_trace["headwind_mps"] != trace["headwind_mps"]
 
             request["trace_trial"] = 9
             rejected = Request(url + "/api/run", json.dumps(request).encode(), {"Content-Type": "application/json"})
