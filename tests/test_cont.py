@@ -1,3 +1,6 @@
+import math
+import weakref
+
 import ecm
 
 params = ecm.VehicleParams()
@@ -20,4 +23,22 @@ E_c1 = cont_euler.stint(10, 12, 1.0, 0.0, 0.0, params.X - 570.0)
 print("Discrete:", E_d)
 print("Continuous (RK4):", E_c)
 print("Continuous (Euler):", E_c1)
+
+
+def test_efficiency_lifetime():
+    for options in ({}, {"integrator": ecm.IntegratorType.Euler}):
+        efficiency = ecm.StepEfficiency()
+        efficiency_ref = weakref.ref(efficiency)
+        model = ecm.ECMContinuous(params, efficiency, **options)
+        del efficiency
+
+        assert efficiency_ref() is not None
+        assert math.isfinite(model.stint(10.0, 12.0, 1.0))
+
+        del model
+        assert efficiency_ref() is None
+
+
+if __name__ == "__main__":
+    test_efficiency_lifetime()
 

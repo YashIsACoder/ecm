@@ -22,3 +22,9 @@ def test_basic_ecm():
 
 if __name__ == "__main__":
     test_basic_ecm()
+    try:
+        ecm.ECM(ecm.VehicleParams(), None)
+    except TypeError:
+        pass
+    else:
+        raise AssertionError("ECM accepted a null efficiency model")

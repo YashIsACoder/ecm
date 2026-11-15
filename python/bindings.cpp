@@ -42,7 +42,8 @@ PYBIND11_MODULE(ecm, m) {
 
     // ================= ECM (discrete) =================
     py::class_<ecm::ECM>(m, "ECM")
-        .def(py::init<const ecm::VehicleParams&, std::shared_ptr<ecm::EfficiencyModel>>())
+        .def(py::init<const ecm::VehicleParams&, std::shared_ptr<ecm::EfficiencyModel>>(),
+             py::arg("params"), py::arg("efficiency").none(false))
         .def("stint", &ecm::ECM::stint,
              py::arg("vi"),
              py::arg("vt"),
@@ -55,13 +56,13 @@ PYBIND11_MODULE(ecm, m) {
     py::class_<ecm_cont::ECMContinuous>(m, "ECMContinuous")
         // Default RK4 constructor
         .def(py::init<const ecm::VehicleParams&, const ecm::EfficiencyModel&>(),
-             py::keep_alive<1, 2>(),
+             py::keep_alive<1, 3>(),
              py::arg("params"),
              py::arg("efficiency"))
 
         // Explicit integrator constructor
         .def(py::init<const ecm::VehicleParams&, const ecm::EfficiencyModel&, ecm_cont::IntegratorType>(),
-             py::keep_alive<1, 2>(),
+             py::keep_alive<1, 3>(),
              py::arg("params"),
              py::arg("efficiency"),
              py::arg("integrator"))
