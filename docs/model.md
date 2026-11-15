@@ -10,9 +10,9 @@ A paired trial draws conditions once, then runs all three policies on that draw.
 
 ## Energy and storage
 
-The example begins at 95% state of charge and reports when the minimum falls below 15%. It uses a 225 kg model vehicle, 0.100 m² drag area, 0.0042 rolling coefficient, 92% drive efficiency, and a 6 m² effective solar array with 24% cell and 92% system efficiencies. The values are example assumptions.
+Each preset begins at 95% state of charge and reports when the minimum falls below 15%. The original reference experiment uses a 225 kg model vehicle, 0.100 m² drag area, 0.0042 rolling coefficient, 92% drive efficiency, and a 6 m² effective solar array with 24% cell and 92% system efficiencies. The [Sunswift presets](sunswift-profiles.md) have separate inputs.
 
-The simulator passes distance, grade, wind and speed to the ECM. The ECM calculates drag, rolling, gravity and the net kinetic energy change. It applies fixed drivetrain losses and a regeneration power limit. Solar generation uses the same library and the stage's irradiance. The car starts and stops once per day in the model. After day one it receives a capped parked solar credit, based on a synthetic 2,200 Wh/m² clear-sky exposure scaled by that day's cloud factor.
+The simulator passes distance, grade, wind, speed and irradiance to the ECM. The segment backend lumps the change in kinetic energy into steady cruise. The cycle backends resolve the speed changes using fixed acceleration and braking rates. They differ in how they estimate motoring losses. The pace cap limits each leg's cruise target. If a leg begins slower or faster than its target, its speed ramp begins at the previous leg's exit speed. The car starts and stops once per day. After day one it receives a capped parked solar credit, based on a synthetic 2,200 Wh/m² exposure scaled by that day's cloud factor.
 
 The storage balance is
 
@@ -22,7 +22,7 @@ end = initial + solar generated - net DC demand - spill
 
 The implementation stores solar generation and net DC demand separately. Net demand can be negative during regeneration. Any surplus over pack capacity is recorded as spill. When net draw exceeds available charge, the car stops partway through the leg under a constant-average-draw assumption. Reaching the finish at exactly zero charge counts as a completion and breaches reserve.
 
-This model holds cruise and forces constant within each leg, accounting for net changes in speed without simulating acceleration time. Driving hours omit breaks and parked charging. It uses an ideal energy reservoir and omits voltage sag, temperature, battery ageing, exact race rules, traffic and time-of-day feedback. The route and pacing assumptions serve as a reproducible experiment, with real-world use requiring measured inputs and validation.
+Battery charge and depletion are evaluated with mean net power within each leg, including when a cycle backend resolves shorter ramps for energy estimation. Driving hours omit breaks and parked charging. The lab uses an ideal energy reservoir. Real-world use requires measured inputs and validation for effects such as battery temperature, voltage sag and traffic.
 
 ## Reading the output
 

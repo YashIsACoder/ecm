@@ -31,3 +31,4 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_*.py'
           ./build/solar-race --trials 8 --seed 42 --pack-kwh 4.5 > trials.csv
           python3 analysis/analyse.py trials.csv
+          python3 analysis/run_matrix.py build/solar-race --route tests/route.csv --trials 3 --out matrix
