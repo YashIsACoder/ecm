@@ -26,4 +26,6 @@ This model holds cruise and forces constant within each leg, accounting for net 
 
 ## Reading the output
 
-Reserve breaches count all trials. Median drive time in the policy table is conditional on completing the route. The paired time comparison uses only the same draws where both policies completed. The 95% Wilson intervals describe Monte Carlo sampling error under the supplied assumptions. They do not capture uncertainty in the synthetic vehicle or scenario generator.
+Reserve breaches count all trials. Median drive time in the policy table is conditional on completing the route. The paired time comparison uses only the draws where both policies completed.
+
+The policy table uses 95% Wilson intervals for completion rates. The comparison table uses [Newcombe's method 10](https://pubmed.ncbi.nlm.nih.gov/9839354/) for paired proportions, keeping the weather draw as the sampling unit. A positive reserve-breach difference means the comparison policy went below reserve more often. Each interval has its own nominal 95% coverage. These intervals quantify Monte Carlo sampling error under the supplied assumptions. The synthetic vehicle and scenario generator introduce additional uncertainty.

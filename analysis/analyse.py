@@ -4,6 +4,8 @@ import argparse
 import csv
 import math
 import statistics
+from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -59,7 +61,45 @@ def wilson(successes: int, count: int) -> tuple[float, float]:
     denominator = 1 + z * z / count
     centre = share + z * z / (2 * count)
     margin = z * math.sqrt((share * (1 - share) + z * z / (4 * count)) / count)
-    return (centre - margin) / denominator, (centre + margin) / denominator
+    return max(0.0, (centre - margin) / denominator), min(1.0, (centre + margin) / denominator)
+
+
+def paired_difference(outcomes: Iterable[tuple[bool, bool]]) -> tuple[float, float, float]:
+    """Risk difference and Newcombe method 10 interval for (comparison, reference) pairs."""
+    counts = Counter(outcomes)
+    both = counts[True, True]
+    comparison_only = counts[True, False]
+    reference_only = counts[False, True]
+    neither = counts[False, False]
+    count = both + comparison_only + reference_only + neither
+    comparison = both + comparison_only
+    reference = both + reference_only
+
+    # Method 10 shrinks positive sample association by a continuity correction.
+    numerator = both * neither - comparison_only * reference_only
+    if numerator > 0:
+        numerator = max(0.0, numerator - count / 2)
+    denominator = math.sqrt(comparison * (count - comparison) * reference * (count - reference))
+    phi = numerator / denominator if denominator else 0.0
+
+    comparison_low, comparison_high = wilson(comparison, count)
+    reference_low, reference_high = wilson(reference, count)
+    comparison_rate = comparison / count
+    reference_rate = reference / count
+    difference = (comparison_only - reference_only) / count
+
+    def margin(first: float, second: float) -> float:
+        return math.sqrt(max(0.0, first**2 - 2 * phi * first * second + second**2))
+
+    return (
+        difference,
+        max(-1.0, difference - margin(comparison_rate - comparison_low, reference_high - reference_rate)),
+        min(1.0, difference + margin(comparison_high - comparison_rate, reference_rate - reference_low)),
+    )
+
+
+def format_difference(estimate: float, low: float, high: float) -> str:
+    return f"{100 * estimate:+.1f} pp ({100 * low:+.1f} to {100 * high:+.1f})"
 
 
 def summarise(by_trial: dict[int, dict[str, Trial]]) -> str:
@@ -81,6 +121,17 @@ def summarise(by_trial: dict[int, dict[str, Trial]]) -> str:
             f"{low:.1%}–{high:.1%} | {breached / count:.1%} | {time} |"
         )
 
+    lines += [
+        "",
+        "| Comparison with steady | Completion difference (95% CI) | Reserve-breach difference (95% CI) |",
+        "| --- | ---: | ---: |",
+    ]
+    for policy in POLICIES[1:]:
+        pairs = [(trial[policy], trial["steady"]) for trial in by_trial.values()]
+        completion = paired_difference((other.completed, steady.completed) for other, steady in pairs)
+        reserve = paired_difference((other.reserve_breached, steady.reserve_breached) for other, steady in pairs)
+        lines.append(f"| {policy} | {format_difference(*completion)} | {format_difference(*reserve)} |")
+
     pairs = [(trial["steady"], trial["reserve-first"]) for trial in by_trial.values()]
     steady_only = sum(steady.completed and not adaptive.completed for steady, adaptive in pairs)
     adaptive_only = sum(adaptive.completed and not steady.completed for steady, adaptive in pairs)
@@ -100,7 +151,11 @@ def summarise(by_trial: dict[int, dict[str, Trial]]) -> str:
             f"Across **{len(common_delta):,}** joint finishes, the median paired drive-time difference "
             f"(reserve-first minus steady) was **{delta:+.1f} minutes**."
         )
-    lines += ["", "The interval covers sampling error under this model. The vehicle and weather assumptions are synthetic."]
+    lines += [
+        "",
+        "Each interval covers Monte Carlo sampling error under the synthetic assumptions "
+        "and applies to its own comparison.",
+    ]
     return "\n".join(lines) + "\n"
 
 

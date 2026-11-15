@@ -28,5 +28,6 @@ jobs:
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build --parallel
           ctest --test-dir build --output-on-failure
+          python3 -m unittest discover -s tests -p 'test_*.py'
           ./build/solar-race --trials 8 --seed 42 --pack-kwh 4.5 > trials.csv
           python3 analysis/analyse.py trials.csv
