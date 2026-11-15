@@ -1,21 +1,13 @@
 "use strict";
 
 import { routes } from "./map-data.mjs";
-import { drawBattery, drawRouteMap, playbackTimeline, policyStyles, raceClock, traceAt, translateTime } from "./replay.mjs";
+import { drawRouteMap, playbackTimeline, raceClock, replaySpeed, skyCondition, traceAt, translateTime } from "./replay.mjs";
 
-const form = document.querySelector("#experiment");
-const run = document.querySelector("#run");
-const status = document.querySelector("#status");
-const outcomes = document.querySelector("#outcomes");
-const summary = document.querySelector("#summary");
-const chart = document.querySelector("#reach");
-const download = document.querySelector("#download");
-const comparison = document.querySelector("#comparison");
-const results = document.querySelector(".results");
-const pack = document.querySelector("#pack");
-const vehicle = document.querySelector("#vehicle");
-const runInputs = document.querySelector("#run-inputs");
-const runNote = document.querySelector("#input-note");
+import { mountSetup } from "./configure.mjs";
+import { settingsFromQuery, setupQuery } from "./scenario.mjs";
+import { downloadFile, numbers, percent, policyLabels as labels, readRun, runQuery, runSummary } from "./run-data.mjs";
+
+const feedback = document.querySelector("#run-feedback");
 const replay = document.querySelector("#replay");
 const play = document.querySelector("#play");
 const nextRest = document.querySelector("#next-rest");
@@ -27,158 +19,36 @@ const placeDisplay = document.querySelector("#race-place");
 const solarDisplay = document.querySelector("#race-solar");
 const cloudDisplay = document.querySelector("#race-cloud");
 const windDisplay = document.querySelector("#race-wind");
+const speedDisplay = document.querySelector("#race-speed");
+const paceDisplay = document.querySelector("#race-target");
+const powerDisplay = document.querySelector("#race-output");
+const planDisplay = document.querySelector("#race-plan");
+const saveScenario = document.querySelector("#save-scenario");
+const mapSky = document.querySelector("#map-sky");
+const rainDisplay = document.querySelector("#race-rain");
+const wetnessDisplay = document.querySelector("#race-wetness");
+const capDisplay = document.querySelector("#race-cap");
+const rate = document.querySelector("#replay-rate");
+const clockMode = document.querySelector("#replay-clock-mode");
 const leg = document.querySelector("#leg");
 const legLabel = document.querySelector("#leg-label");
 const drawLabel = document.querySelector("#draw-label");
 const readouts = document.querySelector("#policy-readouts");
 const map = document.querySelector("#route-map");
-const battery = document.querySelector("#battery");
 const mapHeading = document.querySelector("#route-map-heading");
 const mapKind = document.querySelector("#map-kind");
 const mapCaption = document.querySelector("#map-caption");
-const paired = document.querySelector("#paired");
-const diagnostics = document.querySelector("#trial-diagnostics");
 const energyPlace = document.querySelector("#energy-place");
 const energyBreakdown = document.querySelector("#energy-breakdown");
 const logPolicy = document.querySelector("#log-policy");
 const traceLog = document.querySelector("#trace-log");
-const traceTrial = document.querySelector("#trace-trial");
-const trialCount = document.querySelector("#trials");
-const endpoint = document.querySelector("#route-lab").dataset.endpoint;
-const recordedMode = new URLSearchParams(location.search).get("replay") === "1";
-const numbers = new Intl.NumberFormat("en-AU", { maximumFractionDigits: 0 });
 
-const labels = { steady: "Steady", push: "Push", "reserve-first": "Reserve-first" };
-const presets = { reference: "5.5", sr7: "38", sr8: "45" };
 let current;
-let busy = false;
 let timer;
 let historyKey;
 let timeline;
+let scenario;
 const phaseLabels = { drive: "On course", control: "REST", overnight: "Parked", finish: "Finished", depleted: "Depleted" };
-
-const percent = (value) => `${(100 * value).toFixed(1)}%`;
-const pointDelta = (value) => {
-  const points = 100 * value;
-  return `${points > 0 ? "+" : ""}${points.toFixed(1)}`;
-};
-
-function addCell(row, value, note) {
-  const cell = row.insertCell();
-  cell.textContent = value;
-  if (note) {
-    const extra = document.createElement("span");
-    extra.textContent = note;
-    cell.append(extra);
-  }
-}
-
-function namedRow(table, name) {
-  const row = table.insertRow();
-  const label = document.createElement("th");
-  label.scope = "row";
-  label.textContent = labels[name];
-  row.append(label);
-  return row;
-}
-
-function addPairedCell(row, values) {
-  const [estimate, low, high] = values.map(pointDelta);
-  addCell(row, `${estimate} pp`, `${low} to ${high} pp`);
-}
-
-function render(data, settings, recorded = false) {
-  current = data;
-  summary.replaceChildren();
-  paired.replaceChildren();
-  diagnostics.replaceChildren();
-  for (const policy of data.policies) {
-    const row = namedRow(summary, policy.name);
-    addCell(row, percent(policy.finishes / data.trials), policy.completion_ci.map(percent).join("–"));
-    addCell(row, percent(policy.reserve_breaches / data.trials), policy.reserve_ci.map(percent).join("–"));
-    addCell(row, policy.median_race_hours === null ? "—" : `${policy.median_race_hours.toFixed(2)} h`,
-      policy.median_hours === null ? "" : `${policy.median_hours.toFixed(2)} h driving`);
-    const metrics = policy.diagnostics;
-    const diagnosticRow = namedRow(diagnostics, policy.name);
-    addCell(diagnosticRow, `${numbers.format(metrics.distance_km)} km`);
-    addCell(diagnosticRow, `${metrics.finish_soc_pct.toFixed(1)}%`);
-    addCell(diagnosticRow, `${metrics.min_soc_pct.toFixed(1)}%`);
-    for (const key of ["demand_kwh", "solar_kwh", "spilled_kwh"]) {
-      addCell(diagnosticRow, `${metrics[key].toFixed(2)} kWh`);
-    }
-    if (policy.name !== "steady") {
-      const pairedRow = namedRow(paired, policy.name);
-      addPairedCell(pairedRow, data.completion_vs_steady[policy.name]);
-      addPairedCell(pairedRow, data.reserve_vs_steady[policy.name]);
-    }
-  }
-  const [delta, low, high] = data.completion_vs_steady["reserve-first"].map(pointDelta);
-  comparison.textContent =
-    `Reserve-first vs steady: ${delta} percentage points in finish rate (95% paired interval ${low} to ${high}).`;
-  status.textContent = `${recorded ? "Recorded run · " : ""}${numbers.format(data.trials)} draws · seed ${settings.seed} · ${settings.vehicle.toUpperCase()} · ${settings.model}`;
-  outcomes.hidden = false;
-  drawChart();
-  resetReplay();
-}
-
-function drawChart() {
-  if (!current || outcomes.hidden) {
-    return;
-  }
-  const width = chart.clientWidth;
-  const height = chart.clientHeight;
-  if (!width || !height) {
-    return;
-  }
-  const ratio = window.devicePixelRatio || 1;
-  chart.width = Math.round(width * ratio);
-  chart.height = Math.round(height * ratio);
-  const ctx = chart.getContext("2d");
-  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-  const css = getComputedStyle(chart);
-  const color = (name) => css.getPropertyValue(name).trim();
-  const left = 42;
-  const right = width - 27;
-  const top = 14;
-  const bottom = height - 38;
-  const maxDistance = current.distances_km.at(-1);
-  const x = (distance) => left + (right - left) * distance / maxDistance;
-  const y = (share) => bottom - (bottom - top) * share;
-  ctx.font = "11px system-ui, sans-serif";
-  ctx.fillStyle = color("--muted");
-  ctx.strokeStyle = color("--line");
-  ctx.textBaseline = "middle";
-  ctx.textAlign = "right";
-  for (const share of [0, .25, .5, .75, 1]) {
-    const tick = y(share);
-    ctx.beginPath();
-    ctx.moveTo(left, tick);
-    ctx.lineTo(right, tick);
-    ctx.stroke();
-    ctx.fillText(`${share * 100}%`, left - 6, tick);
-  }
-  ctx.textAlign = "center";
-  for (const fraction of [0, .25, .5, .75, 1]) {
-    const distance = fraction * maxDistance;
-    ctx.fillText(numbers.format(distance), x(distance), bottom + 12);
-  }
-  ctx.fillText("Distance (km)", (left + right) / 2, height - 7);
-  current.policies.forEach((policy) => {
-    ctx.strokeStyle = color(policyStyles[policy.name].color);
-    ctx.setLineDash(policyStyles[policy.name].dash);
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    policy.route_reach.forEach((share, point) => {
-      const position = x(current.distances_km[point]);
-      if (point === 0) {
-        ctx.moveTo(position, y(share));
-      } else {
-        ctx.lineTo(position, y(share));
-      }
-    });
-    ctx.stroke();
-  });
-}
 
 function resetReplay() {
   pauseReplay();
@@ -191,7 +61,8 @@ function resetReplay() {
   mapCaption.textContent = mapRoute.geographic
     ? "Gold markers indicate control stops. Approximate route geometry. Coastline by Natural Earth."
     : "Gold markers indicate control stops on this fictional route.";
-  drawLabel.textContent = `DRAW ${draw} OF ${numbers.format(current.trials)}`;
+  const context = drawLabel.textContent;
+  drawLabel.textContent = `Draw ${draw} · ${context}`;
   timeline = playbackTimeline(logs);
   leg.max = timeline.at(-1).hour;
   leg.disabled = Number(leg.max) === 0;
@@ -229,16 +100,20 @@ function renderReplay() {
   clockDisplay.textContent = clock;
   legLabel.textContent = `${hour.toFixed(1)} / ${horizon.toFixed(1)} h`;
   leg.setAttribute("aria-valuetext", `Day ${day}, ${clock}. ${hour.toFixed(1)} race hours elapsed.`);
+  const analytics = new URL(analyticsLinks[1].href);
+  if (hour > 0) analytics.searchParams.set("at", hour.toFixed(6));
+  else analytics.searchParams.delete("at");
+  if (analytics.href !== analyticsLinks[1].href) analyticsLinks[1].href = analytics.href;
   renderTelemetry(selected, positions[selected]);
   nextRest.disabled = !nextControlHour();
   for (const row of readouts.children) {
     const state = positions[row.dataset.policy];
     row.setAttribute("aria-pressed", String(row.dataset.policy === selected));
     const charge = state.depleted ? "depleted" : `${state.soc.toFixed(0)}% SOC`;
-    row.lastElementChild.textContent = `${numbers.format(state.distance)} km · ${charge} · ${phaseLabels[state.phase]}`;
+    const pace = state.phase === "drive" ? `${numbers.format(replaySpeed(state))} km/h` : phaseLabels[state.phase];
+    row.lastElementChild.textContent = `${numbers.format(state.distance)} km · ${charge} · ${pace}`;
   }
-  drawRouteMap(map, current.trace, positions, selected, night);
-  drawBattery(battery, current.trace.logs, hour, Math.max(horizon, 1e-6), positions);
+  drawRouteMap(map, current.trace, positions, selected, night, hour);
   const key = `${selected}-${positions[selected].reached}`;
   if (key === historyKey) return;
   historyKey = key;
@@ -251,23 +126,44 @@ function nextControlHour() {
   )?.race_arrive_hours;
 }
 
-function renderTelemetry(policy, { event, phase, restRemaining }) {
+function renderTelemetry(policy, state) {
+  const { event, phase, restRemaining } = state;
   const place = current.trace.points[event.leg].name;
   activePolicy.textContent = labels[policy];
   phaseDisplay.textContent = phaseLabels[phase];
   phaseDisplay.dataset.phase = phase;
   const remaining = Math.max(0, Math.ceil((restRemaining ?? 0) * 60 - 1e-4));
   const reasons = {
-    drive: `Toward ${place} · ${event.speed_kmh.toFixed(0)} km/h target`,
+    drive: `Toward ${place}`,
     control: `${place} control · ${remaining} min until release`,
     overnight: `${place} · departure at ${raceClock(Number(leg.value) + (restRemaining ?? 0) + 1e-6).clock}`,
     finish: `Finished at ${place}`,
     depleted: `Battery depleted before ${place}`,
   };
   placeDisplay.textContent = reasons[phase];
+  const driving = phase === "drive";
+  const duration = event.race_arrive_hours - event.race_depart_hours;
+  speedDisplay.textContent = `${numbers.format(replaySpeed(state))} km/h`;
+  paceDisplay.textContent = driving ? `${numbers.format(event.speed_kmh)} km/h` : "—";
+  powerDisplay.textContent = driving && duration > 0 ? `${numbers.format(event.solar_wh / duration)} W` : "—";
+  planDisplay.hidden = !driving || event.planned_arrival_soc_pct == null;
+  if (!planDisplay.hidden) {
+    const target = event.planned_arrival_soc_pct;
+    planDisplay.textContent = target > 100 ? "Arrival energy target exceeds pack capacity"
+      : `Planned arrival charge ${target.toFixed(1)}%`;
+  }
   const weatherAvailable = phase === "drive" || phase === "control";
   solarDisplay.textContent = weatherAvailable ? `${event.irradiance_w_m2.toFixed(0)} W/m²` : "—";
   cloudDisplay.textContent = weatherAvailable ? percent(event.solar_factor) : "—";
+  const rain = event.rain_mm_h ?? 0;
+  const wetness = event.road_wetness ?? 0;
+  const sky = weatherAvailable ? skyCondition(event) : phaseLabels[phase];
+  mapSky.parentElement.dataset.rain = String(weatherAvailable && rain > 0);
+  mapSky.textContent = sky;
+  const rainRate = rain < .05 ? "<0.1" : rain.toFixed(1);
+  rainDisplay.textContent = !weatherAvailable ? "—" : rain > 0 ? `${rainRate} mm/h` : "Dry";
+  wetnessDisplay.textContent = weatherAvailable ? percent(wetness) : "—";
+  capDisplay.textContent = driving ? `${numbers.format(event.effective_pace_cap_kmh ?? event.speed_kmh)} km/h` : "—";
   const wind = event.headwind_mps;
   windDisplay.textContent = weatherAvailable
     ? `${Math.abs(wind).toFixed(1)} m/s ${wind < 0 ? "tail" : "head"}` : "—";
@@ -292,10 +188,13 @@ function renderHistory({ points, logs }, selected, count) {
     const night = event.overnight_hours ? ` · overnight ${event.overnight_hours.toFixed(1)} h` : "";
     heading.textContent = `Day ${day} ${clock} · ${event.depleted ? "Stopped before " : ""}${point.name}${stop}${night}`;
     const details = document.createElement("span");
+    const wet = event.road_wetness > 0 ? ` · wetness ${percent(event.road_wetness)}` : "";
+    const rain = event.rain_mm_h > 0 ? ` · rain ${event.rain_mm_h.toFixed(1)} mm/h` : "";
     const parked = event.parked_wh ? ` · parked solar ${(event.parked_wh / 1000).toFixed(2)} kWh` : "";
-    details.textContent = `${event.speed_kmh.toFixed(0)} km/h target · ${event.soc_pct.toFixed(1)}% SOC · ` +
+    const target = event.planned_arrival_soc_pct == null ? "" : ` / ${event.planned_arrival_soc_pct.toFixed(1)}% planned`;
+    details.textContent = `${(event.mean_speed_kmh ?? event.speed_kmh).toFixed(1)} km/h avg · ${event.speed_kmh.toFixed(1)} km/h target · ${event.soc_pct.toFixed(1)}% SOC${target} · ` +
       `${event.irradiance_w_m2.toFixed(0)} W/m² · solar ${percent(event.solar_factor)} of clear sky · ` +
-      `headwind ${event.headwind_mps.toFixed(1)} m/s · grade ${point.grade_pct.toFixed(2)}% · ` +
+      `headwind ${event.headwind_mps.toFixed(1)} m/s${rain}${wet} · grade ${point.grade_pct.toFixed(2)}% · ` +
       `rolling ×${event.rolling_factor.toFixed(2)} · DC draw ${(event.demand_wh / 1000).toFixed(2)} kWh · ` +
       `driving solar ${(event.solar_wh / 1000).toFixed(2)} kWh${parked}`;
     item.append(heading, details);
@@ -368,11 +267,15 @@ function toggleReplay() {
   }
   play.textContent = "Pause replay";
   const start = performance.now();
-  const offset = translateTime(timeline, Number(leg.value), "hour", "offset");
-  const end = timeline.at(-1);
+  const schedule = clockMode.value === "uniform"
+    ? [{ hour: 0, offset: 0 }, { hour: Number(leg.max), offset: Number(leg.max) }]
+    : timeline;
+  const offset = translateTime(schedule, Number(leg.value), "hour", "offset");
+  const end = schedule.at(-1);
+  const duration = 32_000 / Number(rate.value);
   const advance = (now) => {
-    const to = Math.min(end.offset, offset + (now - start) * end.offset / 32_000);
-    leg.value = translateTime(timeline, to, "offset", "hour");
+    const to = Math.min(end.offset, offset + (now - start) * end.offset / duration);
+    leg.value = translateTime(schedule, to, "offset", "hour");
     renderReplay();
     if (to === end.offset) {
       pauseReplay();
@@ -383,95 +286,67 @@ function toggleReplay() {
   timer = requestAnimationFrame(advance);
 }
 
-async function loadRecorded() {
-  const response = await fetch("./demo.json");
-  if (!response.ok) {
-    throw new Error("The recorded native run is unavailable.");
+const setup = document.querySelector("#setup");
+const setupHost = document.querySelector("#setup-host");
+const analyticsLinks = [
+  document.querySelector("#analytics-nav"), document.querySelector("#analytics-link"),
+];
+let setupLoading = false;
+
+async function openSetup() {
+  if (!setup.open || setupLoading || setupHost.querySelector("form")) return;
+  setupLoading = true;
+  try {
+    const response = await fetch("./configure.html");
+    if (!response.ok) throw new Error("Setup could not be loaded.");
+    const page = new DOMParser().parseFromString(await response.text(), "text/html");
+    const fields = document.importNode(page.querySelector(".setup-fields"), true);
+    mountSetup(fields, scenario?.settings ?? settingsFromQuery(location.search));
+    setupHost.replaceChildren(fields);
+  } catch {
+    const fallback = setupHost.querySelector("a");
+    fallback.href = `./configure.html${setupQuery(scenario?.settings ?? settingsFromQuery(location.search))}`;
+    fallback.textContent = "Open configuration page";
+  } finally {
+    setupLoading = false;
   }
-  const { settings, result } = await response.json();
-  for (const [field, value] of Object.entries(settings)) {
-    form.elements.namedItem(field).value = value ?? "";
-  }
-  runInputs.disabled = true;
-  runNote.textContent = "This homepage demo replays one recorded native run. The local lab can run new experiments.";
-  render(result, settings, true);
 }
+
+setup.addEventListener("toggle", openSetup);
+if (location.hash === "#setup") setup.open = true;
 
 async function runExperiment() {
-  if (busy) {
-    return;
-  }
-  const values = new FormData(form);
-  const settings = Object.fromEntries(values);
-  settings.trials = Number(settings.trials);
-  settings.trace_trial = Number(settings.trace_trial);
-  settings.pack_kwh = settings.pack_kwh === "" ? null : Number(settings.pack_kwh);
-  busy = true;
-  run.disabled = true;
-  download.disabled = true;
-  results.setAttribute("aria-busy", "true");
-  status.classList.remove("error");
-  status.textContent = "Running experiment…";
-  pauseReplay();
   try {
-    if (recordedMode) {
-      await loadRecorded();
-      return;
-    }
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(settings),
+    const { data, settings, recorded } = await readRun();
+    current = data;
+    scenario = { version: 1, settings, ...data.reproduce };
+    analyticsLinks.forEach((link) => {
+      link.href = `./analytics.html${runQuery(settings, recorded)}`;
     });
-    if ([404, 405, 501].includes(response.status)) {
-      await loadRecorded();
-      return;
-    }
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || "The experiment failed.");
-    }
-    render(data, settings);
+    drawLabel.textContent = (recorded ? "RECORDED · " : "") + runSummary(data, settings);
+    saveScenario.disabled = false;
+    feedback.hidden = true;
+    resetReplay();
   } catch (error) {
-    current = undefined;
-    outcomes.hidden = true;
-    replay.hidden = true;
-    status.textContent = error.message;
-    status.classList.add("error");
-  } finally {
-    busy = false;
-    run.disabled = false;
-    download.disabled = !current;
-    results.setAttribute("aria-busy", "false");
+    feedback.textContent = error.message;
+    feedback.classList.add("error");
   }
 }
 
-form.addEventListener("submit", (event) => {
-  event.preventDefault();
-  runExperiment();
-});
-vehicle.addEventListener("change", () => {
-  pack.placeholder = `Preset · ${presets[vehicle.value]} kWh`;
-});
-trialCount.addEventListener("input", () => {
-  traceTrial.max = trialCount.value;
-  if (Number(traceTrial.value) > Number(trialCount.value)) {
-    traceTrial.value = Number(trialCount.value) || 1;
-  }
-});
-function downloadCsv(csv, filename) {
-  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-download.addEventListener("click", () => downloadCsv(current.csv, "solar-race-trials.csv"));
 document.querySelector("#download-trace").addEventListener("click", () => {
-  downloadCsv(current.trace.csv, `solar-race-draw-${current.trace.draw}.csv`);
+  downloadFile(current.trace.csv, `solar-race-draw-${current.trace.draw}.csv`);
+});
+saveScenario.addEventListener("click", () => {
+  downloadFile(JSON.stringify(scenario, null, 2) + "\n", "solar-race-setup.json", "application/json");
 });
 play.addEventListener("click", toggleReplay);
+for (const control of [rate, clockMode]) {
+  control.addEventListener("change", () => {
+    if (timer === undefined) return;
+    pauseReplay();
+    toggleReplay();
+  });
+}
 nextRest.addEventListener("click", () => {
   const hour = nextControlHour();
   if (hour === undefined) return;
@@ -485,8 +360,5 @@ leg.addEventListener("input", () => {
 });
 logPolicy.addEventListener("change", renderReplay);
 
-new ResizeObserver(drawChart).observe(chart);
-const replayResize = new ResizeObserver(renderReplay);
-replayResize.observe(map);
-replayResize.observe(battery);
+new ResizeObserver(renderReplay).observe(map);
 runExperiment();

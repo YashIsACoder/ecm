@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Configure a run · Sunswift Route Lab</title>
+  <link rel="stylesheet" href="./lab.css">
+  <script src="./configure.mjs" type="module"></script>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="./"><span class="mark" aria-hidden="true"></span>ECM / SUNSWIFT ROUTE LAB</a>
+    <nav aria-label="Pages"><a href="./" id="back-results">Race control</a><a href="./methods.html">Methods ↗</a></nav>
+  </header>
+  <main class="setup-page">
+    <div class="intro">
+      <div>
+        <h1>Configure a run</h1>
+        <p>Set the car, pacing rules and weather for a paired Monte Carlo experiment.</p>
+      </div>
+    </div>
+    <div class="setup-fields">
+      <div class="setup-toolbar">
+        <div>
+          <label class="download file-label" for="load-scenario">Load setup JSON</label>
+          <input id="load-scenario" class="sr-only" type="file" accept=".json,application/json">
+        </div>
+        <p id="scenario-status" class="field-note" role="status" hidden></p>
+      </div>
+      <form id="experiment">
+        <div class="setup-grid">
+          <fieldset class="setup-card">
+            <legend>Route and vehicle</legend>
+            <label for="route">Route</label>
+            <select id="route" name="route" required>
+              <option value="outback">Darwin–Adelaide · 3,020 km</option>
+              <option value="rolling">Rolling country · 1,150 km</option>
+            </select>
+            <label for="vehicle">Vehicle</label>
+            <select id="vehicle" name="vehicle" required>
+              <option value="sr7">Sunswift SR7</option>
+              <option value="sr8">SR8 battery + solar scenario</option>
+              <option value="reference">Reference solar car</option>
+            </select>
+            <label for="model">ECM model</label>
+            <select id="model" name="model" required>
+              <option value="segment">Segment · fixed cruise</option>
+              <option value="cycle">Drive cycle · speed ramps</option>
+              <option value="mapped" selected>Mapped cycle · motor efficiency</option>
+            </select>
+            <label for="pack">Usable battery <span>kWh</span></label>
+            <input id="pack" name="pack_kwh" type="number" min="0.001" step="any" placeholder="Preset · 38 kWh">
+            <div class="field-pair">
+              <div>
+                <label for="trials">Trials</label>
+                <input id="trials" name="trials" type="number" required min="1" max="3000" step="1" value="500">
+              </div>
+              <div>
+                <label for="seed">Seed</label>
+                <input id="seed" name="seed" type="text" inputmode="numeric" required pattern="[0-9]{1,20}" value="2025">
+              </div>
+            </div>
+            <label for="trace-trial">Replay draw</label>
+            <input id="trace-trial" name="trace_trial" type="number" required min="1" max="500" step="1" value="15">
+          </fieldset>
+          <fieldset class="setup-card">
+            <legend>Strategy settings</legend>
+            <div class="field-pair">
+              <div>
+                <label for="steady-kmh">Steady <span>km/h</span></label>
+                <input id="steady-kmh" name="steady_kmh" type="number" min="20" max="140" step="any" value="82" required>
+              </div>
+              <div>
+                <label for="push-kmh">Push <span>km/h</span></label>
+                <input id="push-kmh" name="push_kmh" type="number" min="20" max="140" step="any" value="92" required>
+              </div>
+            </div>
+            <label for="reserve-strategy">Reserve-first rule</label>
+            <select id="reserve-strategy" name="reserve_strategy" required>
+              <option value="tiers">Speed tiers</option>
+              <option value="envelope">Route energy envelope</option>
+            </select>
+            <div class="field-pair">
+              <div>
+                <label for="reserve-fast-kmh">Upper <span>km/h</span></label>
+                <input id="reserve-fast-kmh" name="reserve_fast_kmh" type="number" min="20" max="140" step="any" value="92" required>
+              </div>
+              <div>
+                <label for="reserve-slow-kmh">Lower <span>km/h</span></label>
+                <input id="reserve-slow-kmh" name="reserve_slow_kmh" type="number" min="20" max="140" step="any" value="75" required>
+              </div>
+            </div>
+            <div id="middle-tier">
+              <label for="reserve-medium-kmh">Middle tier <span>km/h</span></label>
+              <input id="reserve-medium-kmh" name="reserve_medium_kmh" type="number" min="20" max="140" step="any" value="85" required>
+            </div>
+            <label for="reserve-target">Charge target <span>%</span></label>
+            <input id="reserve-target" name="reserve_target_pct" type="number" min="0" max="100" step="any" value="35" required>
+            <p class="field-note" id="strategy-note"></p>
+          </fieldset>
+          <fieldset class="setup-card">
+            <legend>Solar and weather</legend>
+            <label for="weather">Weather model</label>
+            <select id="weather" name="weather" required>
+              <option value="posterior">Posterior predictive · MCMC</option>
+              <option value="baseline">Synthetic baseline</option>
+            </select>
+              <label for="array-m2">Array area <span>m²</span></label>
+              <input id="array-m2" name="array_m2" type="number" min="0" max="30" step="any">
+              <div class="field-pair">
+                <div>
+                  <label for="cell-efficiency">Cell eff. <span>%</span></label>
+                  <input id="cell-efficiency" name="cell_efficiency_pct" type="number" min=".01" max="100" step="any">
+                </div>
+                <div>
+                  <label for="system-efficiency">System eff. <span>%</span></label>
+                  <input id="system-efficiency" name="system_efficiency_pct" placeholder="Preset · 92" type="number" min=".01" max="100" step="any">
+                </div>
+              </div>
+              <label for="parked-exposure">Parked exposure <span>Wh/m²</span></label>
+              <input id="parked-exposure" name="parked_wh_m2" type="number" min="0" max="10000" step="any" placeholder="Preset · 2,200">
+              <div class="field-pair">
+                <div>
+                  <label for="solar-multiplier">Solar factor <span>×</span></label>
+                  <input id="solar-multiplier" name="solar_multiplier" type="number" min="0" max="2" step="any" value="1" required>
+                </div>
+                <div>
+                  <label for="wind-offset">Wind offset <span>m/s</span></label>
+                  <input id="wind-offset" name="headwind_offset_mps" type="number" min="-25" max="25" step="any" value="0" required>
+                </div>
+              </div>
+              <label for="rain-multiplier">Rain intensity <span>×</span></label>
+              <input id="rain-multiplier" name="rain_multiplier" type="number" min="0" max="2" step="any" value=".65" required>
+              <p class="field-note">Blank hardware fields use the vehicle preset. Rain at 0× is dry. Positive wind offsets add headwind.</p>
+          </fieldset>
+        </div>
+        <div class="setup-submit">
+          <p class="field-note">The routes and weather are synthetic. The SR8 preset uses provisional battery and solar inputs.</p>
+          <button id="run" type="submit">Run experiment <span aria-hidden="true">→</span></button>
+        </div>
+      </form>
+    </div>
+  </main>
+</body>
+</html>

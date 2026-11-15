@@ -17,14 +17,27 @@ def main() -> None:
             url = server.stdout.readline().strip().rsplit(" ", 1)[-1]
             assert url.startswith("http://127.0.0.1:")
             with urlopen(url, timeout=5) as page:
-                assert "Race control" in page.read().decode()
+                dashboard = page.read().decode()
+                assert "Race control" in dashboard and "Experiment setup" in dashboard
+                assert "./analytics.html" in dashboard and 'id="reach"' not in dashboard
+            with urlopen(url + "/analytics.html?trials=8", timeout=5) as page:
+                analytics = page.read().decode()
+                assert 'id="reach"' in analytics and 'id="history-time"' in analytics
+            with urlopen(url + "/configure.html?trials=8", timeout=5) as page:
+                assert 'id="experiment"' in page.read().decode()
+            with urlopen(url + "/scenario.mjs", timeout=5) as asset:
+                assert asset.headers.get_content_type() == "text/javascript"
             with urlopen(url + "/?replay=1", timeout=5) as page:
                 assert page.status == 200
             with urlopen(url + "/demo.json", timeout=5) as response:
-                demo = json.load(response)["result"]
+                bundle = json.load(response)
+                assert bundle["settings"]["reserve_strategy"] == "envelope"
+                demo = bundle["result"]
                 assert demo["trace"]["draw"] == 15 and demo["trace"]["route"] == "outback"
                 assert "race_arrive_hours" in demo["trace"]["logs"]["steady"][0]
-                assert any(event["control_hours"] == 0.5 for event in demo["trace"]["logs"]["steady"])
+                events = demo["trace"]["logs"]["steady"]
+                assert any(event["control_hours"] == 0.5 for event in events)
+                assert any(event["rain_mm_h"] > 0 and event["road_wetness"] > 0 for event in events)
             with urlopen(url + "/methods.html", timeout=5) as methods:
                 assert "Inside the sampler" in methods.read().decode()
             with urlopen(url + "/forecast-demo.json", timeout=5) as response:
@@ -60,6 +73,42 @@ def main() -> None:
             with urlopen(baseline, timeout=10) as response:
                 baseline_trace = json.load(response)["trace"]["logs"]["steady"][0]
             assert baseline_trace["headwind_mps"] != trace["headwind_mps"]
+
+            changes = {
+                "steady_kmh": 66, "push_kmh": 73, "reserve_strategy": "envelope",
+                "reserve_fast_kmh": 80, "reserve_slow_kmh": 60, "reserve_target_pct": 15,
+                "array_m2": 2.25, "cell_efficiency_pct": 23, "system_efficiency_pct": 92,
+                "parked_wh_m2": 1000, "headwind_offset_mps": 3, "solar_multiplier": 0.5,
+            }
+            configured = Request(url + "/api/run", json.dumps(request | changes).encode(),
+                                 {"Content-Type": "application/json"})
+            with urlopen(configured, timeout=10) as response:
+                customized = json.load(response)
+            custom_logs = customized["trace"]["logs"]
+            first_steady = custom_logs["steady"][0]
+            assert first_steady["speed_kmh"] == 66 and 0 < first_steady["mean_speed_kmh"] < 66
+            assert custom_logs["push"][0]["speed_kmh"] == 73
+            assert math.isclose(first_steady["headwind_mps"], baseline_trace["headwind_mps"] + 3, abs_tol=2e-6)
+            assert math.isclose(first_steady["irradiance_w_m2"], baseline_trace["irradiance_w_m2"] / 2, abs_tol=2e-6)
+            assert custom_logs["reserve-first"][0]["planned_arrival_soc_pct"] >= 15
+            duration = first_steady["race_arrive_hours"] - first_steady["race_depart_hours"]
+            expected_solar = 2.25 * .23 * .92 * first_steady["irradiance_w_m2"] * duration
+            assert math.isclose(first_steady["solar_wh"], expected_solar, abs_tol=1e-3)
+            command = [str(Path(sys.argv[1]).resolve()), *customized["reproduce"]["arguments"]]
+            regenerated = subprocess.run(command, cwd=lab.parents[1], check=True, capture_output=True, text=True)
+            assert regenerated.stdout == customized["csv"] and regenerated.stderr == customized["trace"]["csv"]
+
+            wet_case = request | {"route": "outback", "vehicle": "sr7", "weather": "posterior",
+                                  "seed": "2025", "trials": 15, "trace_trial": 15, "rain_multiplier": 2}
+            rainy = Request(url + "/api/run", json.dumps(wet_case).encode(), {"Content-Type": "application/json"})
+            with urlopen(rainy, timeout=10) as response:
+                rainy_trace = json.load(response)["trace"]
+            rainy_events = rainy_trace["logs"]["steady"]
+            assert any(event["rain_mm_h"] > 0 for event in rainy_events)
+            for event in rainy_events:
+                checkpoint = rainy_trace["points"][event["leg"]]
+                assert event["effective_pace_cap_kmh"] <= checkpoint["pace_cap_kmh"]
+                assert event["speed_kmh"] <= event["effective_pace_cap_kmh"]
 
             request["trace_trial"] = 9
             rejected = Request(url + "/api/run", json.dumps(request).encode(), {"Content-Type": "application/json"})

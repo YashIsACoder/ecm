@@ -172,7 +172,49 @@ function mapProjection(geographic, width, height) {
   ];
 }
 
-export function drawRouteMap(canvas, trace, positions, selected, night) {
+export function skyCondition(event) {
+  const rain = event.rain_mm_h ?? 0;
+  if (rain >= 2) return "Rain";
+  if (rain > 0) return "Light rain";
+  if (event.solar_factor > .83) return "Mostly clear";
+  if (event.solar_factor > .60) return "Partly cloudy";
+  return "Overcast";
+}
+
+function drawWeather(ctx, centre, weather, night, hour) {
+  const [x, y] = centre;
+  const cloud = 1 - weather.solar_factor;
+  const rain = weather.rain_mm_h ?? 0;
+  const radius = 38 + 92 * cloud + Math.min(32, rain * 2);
+  const gradient = ctx.createRadialGradient(x, y, 2, x, y, radius);
+  gradient.addColorStop(0, rain > 0 ? "#90b7da76" : night ? "#8291bd57"
+    : cloud > .28 ? "#bfd0d263" : "#e9c45e58");
+  gradient.addColorStop(1, "#00000000");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(x - radius, y - radius, 2 * radius, 2 * radius);
+
+  if (rain <= 0) return;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, radius * .77, radius * .58, 0, 0, Math.PI * 2);
+  ctx.clip();
+  const drops = Math.min(45, 11 + Math.round(rain * 3));
+  ctx.strokeStyle = "#cae1fd68";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let drop = 0; drop < drops; drop += 1) {
+    const span = radius * 2;
+    const localX = (drop * 29.41 + hour * weather.headwind_mps * 1.5 + span * 1000) % span - radius;
+    const localY = (drop * 41.7 + hour * 840) % span - radius;
+    ctx.moveTo(localX, localY);
+    ctx.lineTo(localX - 5, localY + 11);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+export function drawRouteMap(canvas, trace, positions, selected, night, hour = 0) {
   const frame = prepare(canvas);
   if (!frame) return;
   const { ctx, width, height, color } = frame;
@@ -180,10 +222,12 @@ export function drawRouteMap(canvas, trace, positions, selected, night) {
   const project = mapProjection(route.geographic, width, height);
   const points = route.points.map(project);
   const kilometres = [0, ...trace.points.map((point) => point.km)];
-  const weather = positions[selected].event;
+  const active = positions[selected];
+  const weather = active.event;
+  const rainy = (active.phase === "drive" || active.phase === "control") && weather.rain_mm_h > 0;
   const sun = Math.max(0, Math.min(1, weather.irradiance_w_m2 / 1000));
   const sky = ctx.createLinearGradient(0, 0, width, height);
-  sky.addColorStop(0, night ? "#11192c" : sun > .58 ? "#3a4026" : "#253837");
+  sky.addColorStop(0, night ? "#11192c" : rainy ? "#24384d" : sun > .58 ? "#3b4226" : "#253837");
   sky.addColorStop(1, night ? "#0b131b" : "#101e18");
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, width, height);
@@ -211,17 +255,8 @@ export function drawRouteMap(canvas, trace, positions, selected, night) {
       ctx.stroke();
     }
   }
-  const active = positions[selected];
   if (active.phase === "drive" || active.phase === "control") {
-    // A moving local layer shows attenuation on the selected leg, over the map's day/night palette.
-    const [x, y] = positionAt(points, kilometres, active.distance);
-    const cloud = 1 - weather.solar_factor;
-    const radius = 33 + 85 * cloud;
-    const shading = ctx.createRadialGradient(x, y, 3, x, y, radius);
-    shading.addColorStop(0, night ? "#8798c533" : cloud > .28 ? "#adc6d158" : "#f1c45e58");
-    shading.addColorStop(1, "#00000000");
-    ctx.fillStyle = shading;
-    ctx.fillRect(x - radius, y - radius, 2 * radius, 2 * radius);
+    drawWeather(ctx, positionAt(points, kilometres, active.distance), weather, night, hour);
   }
   polyline(ctx, points);
   ctx.strokeStyle = "#0c1913";
@@ -281,24 +316,34 @@ export function drawRouteMap(canvas, trace, positions, selected, night) {
   }
 }
 
-export function drawBattery(canvas, logs, hours, horizon, positions) {
+export function replaySpeed({ event, phase }) {
+  return phase === "drive" ? (event.mean_speed_kmh ?? event.speed_kmh) : 0;
+}
+
+export function drawTelemetryHistory(canvas, logs, hours, horizon, positions, mode) {
   const frame = prepare(canvas);
   if (!frame) return;
   const { ctx, width, height, color } = frame;
   const left = 40, right = width - 14, top = 13, bottom = height - 29;
   const x = (time) => left + (right - left) * time / horizon;
-  const y = (soc) => bottom - (bottom - top) * soc / 100;
+  const speedMode = mode === "speed";
+  const peak = speedMode ? Math.max(20, ...Object.values(logs).flatMap(
+    (events) => events.map((event) => event.mean_speed_kmh ?? event.speed_kmh),
+  )) : 100;
+  const upper = Math.ceil(peak / 20) * 20;
+  const y = (value) => bottom - (bottom - top) * value / upper;
   ctx.font = "10px system-ui, sans-serif";
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";
-  for (const charge of [0, 15, 50, 100]) {
-    polyline(ctx, [[left, y(charge)], [right, y(charge)]]);
-    ctx.setLineDash(charge === 15 ? [3, 4] : []);
-    ctx.strokeStyle = color(charge === 15 ? "--rust" : "--line");
+  for (const value of speedMode ? [0, upper / 2, upper] : [0, 15, 50, 100]) {
+    const reserve = !speedMode && value === 15;
+    polyline(ctx, [[left, y(value)], [right, y(value)]]);
+    ctx.setLineDash(reserve ? [3, 4] : []);
+    ctx.strokeStyle = color(reserve ? "--rust" : "--line");
     ctx.lineWidth = 1;
     ctx.stroke();
     ctx.fillStyle = color("--muted");
-    ctx.fillText(`${charge}%`, left - 7, y(charge));
+    ctx.fillText(speedMode ? String(value) : `${value}%`, left - 7, y(value));
   }
   ctx.setLineDash([]);
   ctx.textAlign = "center";
@@ -309,10 +354,17 @@ export function drawBattery(canvas, logs, hours, horizon, positions) {
   for (const [name, events] of Object.entries(logs)) {
     const points = [];
     for (const event of events) {
-      points.push([x(event.race_depart_hours), y(event.depart_soc_pct)],
-        [x(event.race_arrive_hours), y(event.soc_pct)]);
-      if (event.control_hours) {
-        points.push([x(event.race_arrive_hours + event.control_hours), y(event.soc_pct)]);
+      const { race_depart_hours: depart, race_arrive_hours: arrive } = event;
+      if (speedMode) {
+        const speed = event.mean_speed_kmh ?? event.speed_kmh;
+        points.push([x(depart), y(speed)], [x(arrive), y(speed)]);
+        if (event.control_hours || event.overnight_hours || event === events.at(-1)) {
+          points.push([x(arrive), y(0)]);
+          if (event !== events.at(-1)) points.push([x(arrive + event.control_hours + event.overnight_hours), y(0)]);
+        }
+      } else {
+        points.push([x(depart), y(event.depart_soc_pct)], [x(arrive), y(event.soc_pct)]);
+        if (event.control_hours) points.push([x(arrive + event.control_hours), y(event.soc_pct)]);
       }
     }
     const finish = events.at(-1).race_arrive_hours;
@@ -321,8 +373,10 @@ export function drawBattery(canvas, logs, hours, horizon, positions) {
     ctx.setLineDash(policyStyles[name].dash);
     ctx.lineWidth = 1.7;
     ctx.stroke();
+    const state = positions[name];
+    const value = speedMode ? replaySpeed(state) : state.soc;
     ctx.beginPath();
-    ctx.arc(x(Math.min(hours, finish)), y(positions[name].soc), 3, 0, Math.PI * 2);
+    ctx.arc(x(Math.min(hours, finish)), y(value), 3, 0, Math.PI * 2);
     ctx.fillStyle = ctx.strokeStyle;
     ctx.fill();
   }

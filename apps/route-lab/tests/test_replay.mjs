@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { playbackTimeline, raceClock, traceAt, translateTime } from "../web/replay.mjs";
+import { defaultSettings, readSetupFile, settingsFromQuery, setupQuery } from "../web/scenario.mjs";
+import { playbackTimeline, raceClock, replaySpeed, skyCondition, traceAt, translateTime } from "../web/replay.mjs";
 
 const { result: { trace: { logs } } } = JSON.parse(readFileSync(new URL("../web/demo.json", import.meta.url)));
 const steady = logs.steady;
 const control = steady.find(({ control_hours }) => control_hours > 0);
 const during = traceAt(steady, control.race_arrive_hours + control.control_hours / 2);
 assert.equal(during.phase, "control");
+assert.equal(replaySpeed(during), 0);
+assert.equal(replaySpeed(traceAt(steady, 0)), steady[0].mean_speed_kmh);
 assert.equal(during.distance, control.distance_km);
 assert.ok(Math.abs(during.restRemaining - .25) < 1e-7);
 assert.equal(traceAt(steady, steady[control.leg + 1].race_depart_hours).phase, "drive");
@@ -25,3 +28,12 @@ const testHour = control.race_arrive_hours + .25;
 const offset = translateTime(timeline, testHour, "hour", "offset");
 assert.ok(Math.abs(testHour - translateTime(timeline, offset, "offset", "hour")) < 1e-7);
 assert.equal(translateTime(timeline, timeline.at(-1).offset, "offset", "hour"), timeline.at(-1).hour);
+
+const setup = { ...defaultSettings, trials: 20, seed: "18446744073709551615", array_m2: 0,
+  headwind_offset_mps: -3.25, reserve_strategy: "envelope" };
+assert.deepEqual(settingsFromQuery(setupQuery(setup)), setup);
+assert.equal(settingsFromQuery("?trials=4").trace_trial, 4);
+assert.deepEqual(readSetupFile(JSON.stringify({ version: 1, settings: setup })), setup);
+assert.throws(() => readSetupFile(JSON.stringify({ version: 1, settings: { ...setup, seed: 15 } })));
+assert.equal(skyCondition({ rain_mm_h: 4, solar_factor: .95 }), "Rain");
+assert.equal(skyCondition({ rain_mm_h: 0, solar_factor: .72 }), "Partly cloudy");

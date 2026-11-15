@@ -65,12 +65,24 @@
         <p>The chart connects recorded leg endpoints. Overnight charge represents the next day's aggregate parked-solar credit. Control holds carry no solar credit in this model.</p>
       </article>
       <article class="method-panel">
+        <h2>Rain and road wetness</h2>
+        <p>A separate seeded rain front is more likely to produce showers when the sampled sunlight is low. Road wetness moves toward a rain-dependent equilibrium and decays after the shower.</p>
+        <code>W(x + d) = W_eq + [W(x) − W_eq] exp(−d / L)</code>
+        <p>Rain reduces irradiance. A wet road raises rolling resistance and lowers the cruise cap, even after rain has passed.</p>
+      </article>
+      <article class="method-panel">
+        <h2>Budget charge across the route</h2>
+        <p>The route energy envelope works backward from a terminal charge target. It budgets for the cheapest candidate pace on later legs and credits overnight charging where the pack can hold the required energy.</p>
+        <p>On the current leg, the controller tests nine paces against that budget with the observed weather. It takes the fastest feasible candidate or falls back to the lowest simulated energy draw.</p>
+      </article>
+      <article class="method-panel">
         <h2>Compare racing policies</h2>
         <p>Each draw feeds the same wind, solar and rolling conditions to three pacing policies. The chosen ECM variant computes aerodynamic drag, rolling loss, grade, kinetic energy, drivetrain losses, regeneration and auxiliary load.</p>
         <p>Finish and reserve rates use 95% Wilson intervals. Differences from Steady use paired Newcombe intervals. The intervals quantify Monte Carlo sampling error under the simulated conditions.</p>
       </article>
     </section>
     <footer class="method-sources">
+      <a href="https://www.cambridge.org/engage/miir/article-details/662cb561418a5379b0db608a">Solar race strategy research</a>
       <a href="https://doi.org/10.1093/biomet/57.1.97">Hastings' sampling method</a>
       <a href="https://mc-stan.org/docs/2_40/reference-manual/analysis.html">Chain diagnostics</a>
       <a href="https://worldsolarchallenge.org/files/3297_2025_bwsc_regulations_release_v20_published_28_october_2024.pdf">2025 BWSC regulations, §3.27</a>

@@ -28,6 +28,12 @@ ASSETS = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/lab.css": ("lab.css", "text/css; charset=utf-8"),
     "/lab.mjs": ("lab.mjs", "text/javascript; charset=utf-8"),
+    "/configure.html": ("configure.html", "text/html; charset=utf-8"),
+    "/configure.mjs": ("configure.mjs", "text/javascript; charset=utf-8"),
+    "/scenario.mjs": ("scenario.mjs", "text/javascript; charset=utf-8"),
+    "/analytics.html": ("analytics.html", "text/html; charset=utf-8"),
+    "/analytics.mjs": ("analytics.mjs", "text/javascript; charset=utf-8"),
+    "/run-data.mjs": ("run-data.mjs", "text/javascript; charset=utf-8"),
     "/map-data.mjs": ("map-data.mjs", "text/javascript; charset=utf-8"),
     "/replay.mjs": ("replay.mjs", "text/javascript; charset=utf-8"),
     "/methods.html": ("methods.html", "text/html; charset=utf-8"),
@@ -37,7 +43,24 @@ ASSETS = {
 }
 MAX_TRIALS = 3000
 DEMO = {"route": "outback", "vehicle": "sr7", "model": "mapped", "trials": 500,
-        "seed": "2025", "trace_trial": 15, "pack_kwh": None, "weather": "posterior"}
+        "seed": "2025", "trace_trial": 15, "pack_kwh": None, "weather": "posterior",
+        "reserve_strategy": "envelope", "reserve_target_pct": 15, "reserve_slow_kmh": 65, "rain_multiplier": 0.65}
+
+
+PACE_DEFAULTS = {"steady_kmh": 82, "push_kmh": 92, "reserve_fast_kmh": 92,
+                 "reserve_medium_kmh": 85, "reserve_slow_kmh": 75}
+SOLAR_LIMITS = {
+    "array_m2": ("Solar array area", 0, 30),
+    "cell_efficiency_pct": ("Cell efficiency", 0.01, 100),
+    "system_efficiency_pct": ("System efficiency", 0.01, 100),
+    "parked_wh_m2": ("Parked exposure", 0, 10000),
+}
+
+
+def bounded_number(value, label, minimum, maximum):
+    if type(value) not in (int, float) or not minimum <= value <= maximum:
+        raise ValueError(f"{label} must be from {minimum:g} to {maximum:g}.")
+    return value
 
 
 def experiment_arguments(request: dict) -> tuple[list[str], Path, int]:
@@ -68,6 +91,29 @@ def experiment_arguments(request: dict) -> tuple[list[str], Path, int]:
         if type(pack) not in (int, float) or pack <= 0 or not math.isfinite(pack * 1000.0):
             raise ValueError("Battery capacity must be a positive finite number of kWh.")
         args += ["--pack-kwh", str(pack)]
+
+    reserve_strategy = request.get("reserve_strategy", "tiers")
+    if reserve_strategy not in ("tiers", "envelope"):
+        raise ValueError("Choose speed tiers or an energy envelope.")
+    pace = {name: bounded_number(request.get(name, default), name.replace("_kmh", "").replace("_", " ").title(),
+                                 20, 140) for name, default in PACE_DEFAULTS.items()}
+    if pace["reserve_fast_kmh"] < pace["reserve_slow_kmh"]:
+        raise ValueError("The reserve-first upper speed must be at least its lower speed.")
+    if reserve_strategy == "tiers" and not pace["reserve_fast_kmh"] >= pace["reserve_medium_kmh"] >= pace["reserve_slow_kmh"]:
+        raise ValueError("The middle tier must be between the upper and lower speeds.")
+    numbers = {
+        **pace,
+        "reserve_target_pct": bounded_number(request.get("reserve_target_pct", 35), "Charge target", 0, 100),
+        "solar_multiplier": bounded_number(request.get("solar_multiplier", 1), "Solar multiplier", 0, 2),
+        "headwind_offset_mps": bounded_number(request.get("headwind_offset_mps", 0), "Wind offset", -25, 25),
+        "rain_multiplier": bounded_number(request.get("rain_multiplier", 0), "Rain multiplier", 0, 2),
+    }
+    for name, (label, minimum, maximum) in SOLAR_LIMITS.items():
+        if request.get(name) is not None:
+            numbers[name] = bounded_number(request[name], label, minimum, maximum)
+    args += ["--reserve-strategy", reserve_strategy]
+    for name, value in numbers.items():
+        args.extend(["--" + name.replace("_", "-"), str(value)])
     return args, path, trials
 
 
@@ -150,8 +196,11 @@ def run_case(executable: Path, request: dict) -> dict:
         logs[name].append({"leg": leg, **observation})
     if any(not events for events in logs.values()):
         raise ValueError("The native simulator omitted the requested leg trace.")
+    portable_args = [*args]
+    portable_args[1] = f"data/routes/{route.name}"
     return {
-        "trials": count, "distances_km": distances, "policies": policies,
+        "trials": count, "distances_km": distances,
+        "reproduce": {"arguments": portable_args, "route_sha256": hashlib.sha256(route.read_bytes()).hexdigest()}, "policies": policies,
         "completion_vs_steady": comparisons, "reserve_vs_steady": reserve_comparisons, "csv": completed.stdout,
         "trace": {"draw": request.get("trace_trial", 1), "route": request["route"], "points": route_points, "logs": logs,
                   "csv": completed.stderr},

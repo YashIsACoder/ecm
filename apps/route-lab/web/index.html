@@ -10,23 +10,31 @@
 <body>
   <header class="top">
     <a class="brand" href="./"><span class="mark" aria-hidden="true"></span>ECM / SUNSWIFT ROUTE LAB</a>
-    <nav aria-label="Pages"><a href="./methods.html">Forecast methods <span aria-hidden="true">↗</span></a></nav>
+    <nav aria-label="Pages"><a href="./analytics.html" id="analytics-nav">Race outcomes</a><a href="./methods.html">Methods <span aria-hidden="true">↗</span></a></nav>
   </header>
-  <main id="route-lab" data-endpoint="./api/run">
+  <main id="route-lab">
     <div class="intro">
       <div>
         <h1>Sunswift Route Lab</h1>
         <p>Race the Stuart Highway with three pacing strategies under the same simulated weather.</p>
       </div>
-      <div class="solar-grid" aria-hidden="true"></div>
     </div>
+    <details id="setup" class="inline-setup">
+      <summary>Experiment setup</summary>
+      <div id="setup-host"><a href="./configure.html">Open setup</a></div>
+    </details>
+    <p id="run-feedback" class="run-feedback" role="status">Running experiment…</p>
     <section class="replay" id="replay" aria-labelledby="replay-heading" hidden>
       <div class="section-head">
         <div>
           <p class="readout" id="draw-label"></p>
           <h2 id="replay-heading">Race control</h2>
         </div>
-        <button type="button" id="download-trace" class="download">Download trace</button>
+        <div class="run-actions">
+          <a href="./analytics.html" id="analytics-link" class="download">Race outcomes ↗</a>
+          <button type="button" id="save-scenario" class="download" disabled>Save run setup</button>
+          <button type="button" id="download-trace" class="download">Download trace</button>
+        </div>
       </div>
       <div class="timeline">
         <button type="button" id="play" class="play">Play replay</button>
@@ -34,6 +42,17 @@
         <label for="leg" class="sr-only">Elapsed race time</label>
         <input id="leg" type="range" min="0" max="0" step="any" value="0">
         <output id="leg-label" for="leg"></output>
+      </div>
+      <div class="replay-options">
+        <label for="replay-rate">Playback rate</label>
+        <select id="replay-rate">
+          <option value="0.5">0.5×</option><option value="1" selected>1×</option>
+          <option value="2">2×</option><option value="4">4×</option>
+        </select>
+        <label for="replay-clock-mode">Clock pacing</label>
+        <select id="replay-clock-mode">
+          <option value="highlights">Race highlights</option><option value="uniform">Uniform time scale</option>
+        </select>
       </div>
       <div class="race-dashboard">
         <figure class="map-card">
@@ -44,6 +63,7 @@
           <div class="map-frame">
             <canvas id="route-map" role="img" aria-label="Animated Sunswift-style cars positioned along the simulated route. Each strategy’s distance and charge are shown alongside."></canvas>
             <div class="map-clock"><span id="race-day"></span><strong id="race-clock"></strong><span>Race clock</span></div>
+            <div class="map-sky"><span class="sky-dot" aria-hidden="true"></span><span id="map-sky"></span></div>
           </div>
           <figcaption id="map-caption"></figcaption>
         </figure>
@@ -51,14 +71,21 @@
           <section class="telemetry" aria-label="Selected strategy telemetry">
             <div class="telemetry-head"><strong id="active-policy"></strong><span id="race-phase" class="phase"></span></div>
             <p id="race-place"></p>
+            <dl class="pace-strip">
+              <div><dt>Leg average</dt><dd id="race-speed"></dd></div>
+              <div><dt>Cruise target</dt><dd id="race-target"></dd></div>
+              <div><dt>Solar output</dt><dd id="race-output"></dd></div>
+            </dl>
+            <p id="race-plan" hidden></p>
             <dl class="weather-strip">
               <div><dt>Irradiance</dt><dd id="race-solar"></dd></div>
               <div><dt>Clear-sky fraction</dt><dd id="race-cloud"></dd></div>
               <div><dt>Wind</dt><dd id="race-wind"></dd></div>
+              <div><dt>Rain</dt><dd id="race-rain"></dd></div>
+              <div><dt>Road wetness</dt><dd id="race-wetness"></dd></div>
+              <div><dt>Effective pace cap</dt><dd id="race-cap"></dd></div>
             </dl>
           </section>
-          <div class="panel-heading"><h3>Battery through the draw</h3><span>15% reserve</span></div>
-          <canvas id="battery" role="img" aria-label="State of charge by elapsed race time for the three strategies, with a dashed 15 percent reserve line."></canvas>
           <div id="policy-readouts" class="policy-readouts" aria-label="Select a strategy to inspect"></div>
         </div>
       </div>
@@ -77,104 +104,7 @@
       </div>
       <ol id="trace-log" class="trace-log"></ol>
     </section>
-    <div class="workspace">
-      <aside class="settings">
-        <h2>Experiment</h2>
-        <form id="experiment">
-          <fieldset id="run-inputs">
-          <label for="route">Route</label>
-          <select id="route" name="route">
-            <option value="outback">Darwin–Adelaide · 3,020 km</option>
-            <option value="rolling">Rolling country · 1,150 km</option>
-          </select>
-          <label for="vehicle">Vehicle</label>
-          <select id="vehicle" name="vehicle">
-            <option value="sr7">Sunswift SR7</option>
-            <option value="sr8">SR8 battery + solar scenario</option>
-            <option value="reference">Reference solar car</option>
-          </select>
-          <label for="model">ECM model</label>
-          <select id="model" name="model">
-            <option value="segment">Segment · fixed cruise</option>
-            <option value="cycle">Drive cycle · speed ramps</option>
-            <option value="mapped" selected>Mapped cycle · motor efficiency</option>
-          </select>
-          <label for="weather">Weather model</label>
-          <select id="weather" name="weather">
-            <option value="posterior">Posterior predictive · MCMC</option>
-            <option value="baseline">Synthetic baseline</option>
-          </select>
-          <label for="pack">Usable battery <span>kWh</span></label>
-          <input id="pack" name="pack_kwh" type="number" min="0.001" step="any" placeholder="Preset · 38 kWh">
-          <div class="field-pair">
-            <div>
-              <label for="trials">Trials</label>
-              <input id="trials" name="trials" type="number" required min="1" max="3000" step="1" value="500">
-            </div>
-            <div>
-              <label for="seed">Seed</label>
-              <input id="seed" name="seed" type="text" inputmode="numeric" required pattern="[0-9]{1,20}" value="2025">
-            </div>
-          </div>
-          <label for="trace-trial">Replay draw</label>
-          <input id="trace-trial" name="trace_trial" type="number" required min="1" max="500" step="1" value="15">
-          <button id="run" type="submit">Run experiment</button>
-          </fieldset>
-        </form>
-        <p class="settings-note" id="input-note">The routes and weather are synthetic. The SR8 preset covers battery and solar operation with provisional inputs.</p>
-      </aside>
-      <section class="results" aria-labelledby="results-heading" aria-busy="true">
-        <div class="section-head">
-          <div>
-            <p class="readout" id="status" role="status">Running the first experiment…</p>
-            <h2 id="results-heading">Race outcomes</h2>
-          </div>
-          <button type="button" id="download" class="download" disabled>Download CSV</button>
-        </div>
-        <div id="outcomes" hidden>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr><th scope="col">Strategy</th><th scope="col">Finish rate <span>95% interval</span></th><th scope="col">Below reserve <span>95% interval</span></th><th scope="col">Median race time <span>Finishers only</span></th></tr>
-              </thead>
-              <tbody id="summary"></tbody>
-            </table>
-          </div>
-          <div class="chart-section">
-            <h3>How far did the car get?</h3>
-            <p>Share of trials that reached each distance.</p>
-            <ul class="legend" aria-label="Chart series">
-              <li><i class="steady"></i>Steady</li><li><i class="push"></i>Push</li><li><i class="reserve"></i>Reserve-first</li>
-            </ul>
-            <canvas id="reach" role="img" aria-label="Share of trials reaching each distance for the three pacing strategies. Finish rates are in the table above."></canvas>
-          </div>
-          <p class="comparison" id="comparison"></p>
-          <details class="diagnostics">
-            <summary>All trial diagnostics and paired intervals</summary>
-            <div class="table-wrap">
-              <table>
-                <caption>Difference from steady · 95% paired interval</caption>
-                <thead><tr><th scope="col">Strategy</th><th scope="col">Finish rate</th><th scope="col">Below reserve</th></tr></thead>
-                <tbody id="paired"></tbody>
-              </table>
-              <table>
-                <caption>Median across all simulated trials</caption>
-                <thead>
-                  <tr><th scope="col">Strategy</th><th scope="col">Distance</th><th scope="col">Final charge</th>
-                  <th scope="col">Min. charge</th><th scope="col">DC demand</th><th scope="col">Solar</th><th scope="col">Spill</th></tr>
-                </thead>
-                <tbody id="trial-diagnostics"></tbody>
-              </table>
-            </div>
-          </details>
-        </div>
-      </section>
-    </div>
-    <details>
-      <summary>How the strategy comparison works</summary>
-      <p>Before racing, a strategy team needs to know how much pace the battery can support when the weather changes. The lab draws possible conditions, runs all three policies on each draw, then measures how often each policy finishes or dips below 15% charge.</p>
-      <p>Steady targets 82 km/h. Push targets 92 km/h. Reserve-first chooses 92, 85 or 75 km/h based on the energy it expects to spend on the current leg. Each strategy respects the leg’s cruise target cap. The intervals measure uncertainty from the simulated sample.</p>
-    </details>
+
   </main>
 </body>
 </html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Race analytics · Sunswift Route Lab</title>
+  <link rel="stylesheet" href="./lab.css">
+  <script src="./analytics.mjs" type="module"></script>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="./"><span class="mark" aria-hidden="true"></span>ECM / SUNSWIFT ROUTE LAB</a>
+    <nav aria-label="Pages"><a id="back-map" href="./">Race control</a><a href="./methods.html">Methods ↗</a></nav>
+  </header>
+  <main class="analytics">
+    <div class="intro"><div><h1>Race analytics</h1><p>Compare outcomes across all draws and inspect the replay’s speed and battery traces.</p></div></div>
+    <p id="run-feedback" class="run-feedback" role="status">Loading race analytics…</p>
+    <section class="results" id="race-outcomes" aria-labelledby="results-heading" hidden>
+      <div class="section-head">
+        <div>
+          <p class="readout" id="status"></p>
+          <h2 id="results-heading">Race outcomes</h2>
+        </div>
+        <button type="button" id="download" class="download" disabled>Download CSV</button>
+      </div>
+      <div id="outcomes" hidden>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th scope="col">Strategy</th><th scope="col">Finish rate <span>95% interval</span></th><th scope="col">Below reserve <span>95% interval</span></th><th scope="col">Median race time <span>Finishers only</span></th></tr>
+            </thead>
+            <tbody id="summary"></tbody>
+          </table>
+        </div>
+        <div class="chart-section">
+          <h3>How far did the car get?</h3>
+          <p>Share of trials that reached each distance.</p>
+          <ul class="legend" aria-label="Chart series">
+            <li><i class="steady"></i>Steady</li><li><i class="push"></i>Push</li><li><i class="reserve"></i>Reserve-first</li>
+          </ul>
+          <canvas id="reach" role="img" aria-label="Share of trials reaching each distance for the three pacing strategies. Finish rates are in the table above."></canvas>
+        </div>
+        <p class="comparison" id="comparison"></p>
+        <details class="diagnostics">
+          <summary>All trial diagnostics and paired intervals</summary>
+          <div class="table-wrap">
+            <table>
+              <caption>Difference from steady · 95% paired interval</caption>
+              <thead><tr><th scope="col">Strategy</th><th scope="col">Finish rate</th><th scope="col">Below reserve</th></tr></thead>
+              <tbody id="paired"></tbody>
+            </table>
+            <table>
+              <caption>Median across all simulated trials</caption>
+              <thead>
+                <tr><th scope="col">Strategy</th><th scope="col">Distance</th><th scope="col">Final charge</th>
+                <th scope="col">Min. charge</th><th scope="col">DC demand</th><th scope="col">Solar</th><th scope="col">Spill</th></tr>
+              </thead>
+              <tbody id="trial-diagnostics"></tbody>
+            </table>
+          </div>
+        </details>
+      </div>
+    </section>
+    <section class="results telemetry-history" id="history" aria-labelledby="history-title" hidden>
+      <div class="section-head history-heading">
+        <div><p class="readout" id="draw-label"></p><h2 id="history-title">Battery history</h2></div>
+        <div class="history-switch" role="group" aria-label="Telemetry history">
+          <button type="button" data-history="battery" aria-pressed="true">Battery</button>
+          <button type="button" data-history="speed" aria-pressed="false">Speed</button>
+        </div>
+      </div>
+      <ul class="legend" aria-label="Chart series">
+        <li><i class="steady"></i>Steady</li><li><i class="push"></i>Push</li><li><i class="reserve"></i>Reserve-first</li>
+      </ul>
+      <canvas id="battery" role="img" aria-label="State of charge by elapsed race time for the three strategies, with a dashed 15 percent reserve line."></canvas>
+      <div class="history-scrub">
+        <label for="history-time">Inspect race time</label>
+        <input id="history-time" type="range" min="0" max="0" step="any" value="0">
+        <output for="history-time" id="history-clock"></output>
+      </div>
+      <ul id="history-values" class="history-values" aria-label="Values at selected race time"></ul>
+    </section>
+  </main>
+</body>
+</html>
