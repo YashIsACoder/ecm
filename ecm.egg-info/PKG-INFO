@@ -1,9 +1,0 @@
-Metadata-Version: 2.4
-Name: ecm
-Version: 0.1.0
-Summary: Energy Consumption Model (ECM) with Python bindings
-License-File: LICENSE.md
-Requires-Dist: pybind11>=2.11
-Dynamic: license-file
-Dynamic: requires-dist
-Dynamic: summary

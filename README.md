@@ -147,20 +147,17 @@ ECM_module/
 
 ## Testing
 
-### Python test
+Run the C++ and Python tests together from a CMake build with bindings enabled.
 
 ```bash
-python tests/test_ecm.py
+cmake -S . -B build-python -DECM_BUILD_PYTHON=ON
+cmake --build build-python --parallel
+ctest --test-dir build-python --output-on-failure
 ```
 
-### C++ test
-
-```bash
-cd build
-./ecm_test
-```
-
-> Ensure C++ test is built via CMake (`cmake .. && cmake --build .`) before running.
+CMake uses an installed pybind11 3.0.1 or newer, and fetches v3.0.1 if none
+is available. With multiple Python environments, pass
+`-DPython3_EXECUTABLE=/path/to/python3` to choose the test interpreter.
 
 ---
 

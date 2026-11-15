@@ -36,9 +36,8 @@ target_include_directories(ecm
 target_compile_features(ecm PUBLIC cxx_std_20)
 
 target_compile_options(ecm PRIVATE
-    -Wall
-    -Wextra
-    -Wpedantic
+    $<$<CXX_COMPILER_ID:MSVC>:/W4>
+    $<$<CXX_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>
 )
 
 # =========================
@@ -60,9 +59,8 @@ target_include_directories(ecm_cont
 target_compile_features(ecm_cont PUBLIC cxx_std_20)
 
 target_compile_options(ecm_cont PRIVATE
-    -Wall
-    -Wextra
-    -Wpedantic
+    $<$<CXX_COMPILER_ID:MSVC>:/W4>
+    $<$<CXX_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>
 )
 
 target_link_libraries(ecm_cont
@@ -76,21 +74,26 @@ target_link_libraries(ecm_cont
 if(ECM_BUILD_PYTHON)
     find_package(Python3 REQUIRED COMPONENTS Interpreter Development.Module)
 
-    include(FetchContent)
-    FetchContent_Declare(
-        pybind11
-        GIT_REPOSITORY https://github.com/pybind/pybind11.git
-        GIT_TAG v2.11.1
-    )
-    FetchContent_MakeAvailable(pybind11)
+    set(PYBIND11_FINDPYTHON ON)
+    find_package(pybind11 3.0.1 CONFIG QUIET)
+    if(NOT pybind11_FOUND)
+        include(FetchContent)
+        FetchContent_Declare(
+            pybind11
+            GIT_REPOSITORY https://github.com/pybind/pybind11.git
+            GIT_TAG v3.0.1
+            GIT_SHALLOW TRUE
+        )
+        FetchContent_MakeAvailable(pybind11)
+    endif()
 
+    set_target_properties(ecm ecm_cont PROPERTIES POSITION_INDEPENDENT_CODE ON)
     pybind11_add_module(ecm_py
         python/bindings.cpp
     )
 
     target_link_libraries(ecm_py
         PRIVATE
-            ecm
             ecm_cont
     )
 
@@ -119,6 +122,14 @@ if(ECM_BUILD_TESTS)
     add_executable(ecm_segment_test tests/test_segment.cpp)
     target_link_libraries(ecm_segment_test PRIVATE ecm)
     add_test(NAME ECM.Segment COMMAND ecm_segment_test)
+
+    if(ECM_BUILD_PYTHON)
+        foreach(test_name IN ITEMS test_ecm test_cont)
+            add_test(NAME ECM.Python.${test_name}
+                COMMAND "${CMAKE_COMMAND}" -E env "PYTHONPATH=$<TARGET_FILE_DIR:ecm_py>"
+                "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/${test_name}.py")
+        endforeach()
+    endif()
 endif()
 
 # =========================
