@@ -47,6 +47,7 @@ add_library(ecm_cont STATIC
     src/ecm_cont/integrator.cpp
     src/ecm_cont/dynamics.cpp
     src/ecm_cont/ecm_continuous.cpp
+    src/ecm_cont/drive_cycle.cpp
 )
 add_library(ECM::ecm_cont ALIAS ecm_cont)
 
@@ -122,6 +123,10 @@ if(ECM_BUILD_TESTS)
     add_executable(ecm_segment_test tests/test_segment.cpp)
     target_link_libraries(ecm_segment_test PRIVATE ecm)
     add_test(NAME ECM.Segment COMMAND ecm_segment_test)
+
+    add_executable(ecm_drive_cycle_test tests/test_drive_cycle.cpp)
+    target_link_libraries(ecm_drive_cycle_test PRIVATE ecm_cont)
+    add_test(NAME ECM.DriveCycle COMMAND ecm_drive_cycle_test)
 
     if(ECM_BUILD_PYTHON)
         foreach(test_name IN ITEMS test_ecm test_cont)

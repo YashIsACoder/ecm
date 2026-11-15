@@ -1,29 +1,17 @@
 #include "ecm/segment.hpp"
 
 #include "ecm/forces.hpp"
+#include "energy_inputs.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
 namespace ecm {
-namespace {
-
-constexpr double joules_per_wh = 3600.0;
-
-bool nonnegative(double value) {
-    return std::isfinite(value) && value >= 0.0;
-}
-
-bool positive(double value) {
-    return nonnegative(value) && value > 0.0;
-}
-
-bool efficiency(double value) {
-    return nonnegative(value) && value <= 1.0;
-}
-
-}  // namespace
+using detail::efficiency;
+using detail::joules_per_wh;
+using detail::nonnegative;
+using detail::positive;
 
 double SegmentEnergy::wheel_wh() const noexcept {
     return drag_wh + rolling_wh + climb_wh + kinetic_wh;
@@ -35,13 +23,7 @@ double SegmentEnergy::demand_wh() const noexcept {
 
 SegmentEnergy drive_energy(const VehicleParams& vehicle, const RoadSegment& segment,
                            const Drivetrain& drivetrain) {
-    if (!positive(vehicle.m) || !positive(vehicle.g) || !positive(vehicle.rho) ||
-        !nonnegative(vehicle.Cd) || !nonnegative(vehicle.A) || !nonnegative(vehicle.Crr) ||
-        !nonnegative(vehicle.X) || !efficiency(drivetrain.drive_efficiency) ||
-        drivetrain.drive_efficiency == 0.0 || !efficiency(drivetrain.regen_efficiency) ||
-        !nonnegative(drivetrain.max_regen_power_w)) {
-        throw std::invalid_argument("invalid vehicle or drivetrain parameters");
-    }
+    detail::validate_drive(vehicle, drivetrain);
     if (!positive(segment.distance_m) || !positive(segment.cruise_speed_mps) ||
         !nonnegative(segment.entry_speed_mps) || !nonnegative(segment.exit_speed_mps) ||
         !std::isfinite(segment.grade) || !std::isfinite(segment.headwind_mps)) {

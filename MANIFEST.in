@@ -1,1 +1,2 @@
 recursive-include include *.hpp
+include src/energy_inputs.hpp
