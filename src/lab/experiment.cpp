@@ -12,16 +12,25 @@ std::vector<Leg> default_route() {
 }
 
 void run_experiment(std::span<const Leg> route, const Config& config,
-                    Experiment experiment, const TrialSink& sink) {
+                    Experiment experiment, const TrialSink& sink, const TrialTrace& trace) {
     if (route.empty() || experiment.trials == 0 || !sink) {
         throw std::invalid_argument("an experiment requires a route, at least one trial and a result sink");
+    }
+    if (trace.sink && (trace.trial == 0 || trace.trial > experiment.trials)) {
+        throw std::invalid_argument("traced trial must be between 1 and the number of trials");
     }
 
     std::mt19937_64 random(experiment.seed);
     for (std::uint64_t trial = 0; trial < experiment.trials; ++trial) {
         const auto weather = draw_weather(route, random);
         for (const auto policy : policies) {
-            sink({trial + 1, policy, simulate(route, weather, config, policy)});
+            if (trace.sink && trace.trial == trial + 1) {
+                sink({trial + 1, policy, simulate(route, weather, config, policy, [&](const LegObservation& leg) {
+                    trace.sink(policy, leg);
+                })});
+            } else {
+                sink({trial + 1, policy, simulate(route, weather, config, policy)});
+            }
         }
     }
 }

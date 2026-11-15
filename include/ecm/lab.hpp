@@ -3,6 +3,7 @@
 #include "ecm_cont/route_energy.hpp"
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <functional>
@@ -79,16 +80,35 @@ struct TrialResult {
 
 using TrialSink = std::function<void(const TrialResult&)>;
 
+struct LegObservation {
+    std::size_t leg;  // Zero-based route index.
+    Weather weather;
+    double distance_km;  // Cumulative, including a partly completed final leg.
+    double cruise_kmh;
+    double arrive_soc;
+    double solar_wh;  // Energy collected while driving this leg.
+    double demand_wh;
+    double parked_wh;
+    bool depleted;
+};
+
+using LegSink = std::function<void(const LegObservation&)>;
+
+struct TrialTrace {
+    std::uint64_t trial = 0;  // One-based, required when a sink is supplied.
+    std::function<void(Policy, const LegObservation&)> sink;
+};
+
 [[nodiscard]] std::vector<Leg> default_route();
 [[nodiscard]] std::vector<Leg> read_route(const std::filesystem::path& path);
 [[nodiscard]] std::vector<Leg> read_route(std::istream& csv, std::string_view source_name);
 [[nodiscard]] std::vector<Weather> draw_weather(std::span<const Leg> route, std::mt19937_64& random);
 [[nodiscard]] Result simulate(std::span<const Leg> route, std::span<const Weather> weather,
-                              const Config& config, Policy policy);
+                              const Config& config, Policy policy, const LegSink& trace = {});
 
 // Calls the sink synchronously for each result in trial and policy order.
 // Exceptions from the model or sink stop the experiment and propagate.
 void run_experiment(std::span<const Leg> route, const Config& config,
-                    Experiment experiment, const TrialSink& sink);
+                    Experiment experiment, const TrialSink& sink, const TrialTrace& trace = {});
 
 }  // namespace ecm::lab

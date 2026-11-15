@@ -74,6 +74,7 @@ int main() {
     std::mt19937_64 experiment_seed(42);
     const auto first_draw = draw_weather(route, experiment_seed);
     std::size_t rows = 0;
+    std::size_t traced_legs = 0;
     run_experiment(route, defaults, {2, 42}, [&](const TrialResult& trial) {
         check(trial.trial == rows / policies.size() + 1 && trial.policy == policies[rows % policies.size()],
               "trial numbering and policy order");
@@ -82,6 +83,11 @@ int main() {
             near(trial.result.finish_soc, expected.finish_soc, "policies use the same weather draw");
         }
         ++rows;
-    });
+    }, {1, [&](Policy, const LegObservation& observation) {
+        near(observation.weather.headwind_mps, first_draw[observation.leg].headwind_mps,
+             "tracing uses the same wind as the paired draw");
+        ++traced_legs;
+    }});
     check(rows == 2 * policies.size(), "experiment streams all policy outcomes");
+    check(traced_legs == route.size() * policies.size(), "only the chosen draw emits leg logs");
 }

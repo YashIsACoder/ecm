@@ -98,7 +98,7 @@ std::vector<Weather> draw_weather(std::span<const Leg> route, std::mt19937_64& r
 }
 
 Result simulate(std::span<const Leg> route, std::span<const Weather> weather, const Config& config,
-                Policy policy) {
+                Policy policy, const LegSink& trace) {
     if (route.empty() || route.size() != weather.size() || !std::isfinite(config.capacity_wh) ||
         config.capacity_wh <= 0.0 || !fraction(config.start_soc) || !fraction(config.reserve_soc) || !config.energy_model ||
         !std::isfinite(config.parked_clear_sky_wh_m2) || config.parked_clear_sky_wh_m2 < 0.0) {
@@ -121,9 +121,10 @@ Result simulate(std::span<const Leg> route, std::span<const Weather> weather, co
         const auto& conditions = weather[index];
         const bool new_day = index > 0 && leg.day != route[index - 1].day;
         const bool end_of_day = index + 1 == route.size() || leg.day != route[index + 1].day;
+        double parked_wh = 0.0;
         if (new_day) {
             // A one-hour equivalent irradiance gives the prescribed Wh/m^2 exposure.
-            const double parked_wh = ecm::solar_energy_wh(
+            parked_wh = ecm::solar_energy_wh(
                 config.array, config.parked_clear_sky_wh_m2 * conditions.park_solar_factor, 3600.0);
             result.solar_wh += parked_wh;
             store(parked_wh);
@@ -137,6 +138,10 @@ Result simulate(std::span<const Leg> route, std::span<const Weather> weather, co
         result.demand_wh += energy.demand_wh * portion;
         result.solar_wh += energy.solar_wh * portion;
         store(-energy.net_wh() * portion);
+        if (trace) {
+            trace({index, conditions, result.distance_km, speed, stored_wh / config.capacity_wh,
+                   energy.solar_wh * portion, energy.demand_wh * portion, parked_wh, depleted});
+        }
         if (depleted) {
             result.completed = false;
             break;
