@@ -1,0 +1,29 @@
+name: Simulator build
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: simulator
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/solar-ecm-cpp
+          ref: 401ca52b5f310cdfb4d0c044c5ff273dab0e84d3
+          path: solar-ecm-cpp
+      - working-directory: simulator
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel
+          ctest --test-dir build --output-on-failure
+          ./build/solar-race --trials 8 --seed 42 --pack-kwh 4.5 > trials.csv
+          python3 analysis/analyse.py trials.csv
