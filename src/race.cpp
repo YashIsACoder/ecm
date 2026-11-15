@@ -7,30 +7,25 @@
 namespace solar_race {
 namespace {
 
-struct LegEnergy {
-    double seconds;
-    double demand_wh;
-    double sun_wh;
-
-    double net_wh() const { return demand_wh - sun_wh; }
-};
-
 struct PacedLeg {
     double speed_kmh;
-    LegEnergy energy;
+    ecm_cont::RouteEnergy energy;
 };
 
-LegEnergy leg_energy(const Config& config, const Leg& leg, const Weather& weather,
-                     double entry_speed_kmh, double cruise_speed_kmh, bool end_of_day) {
+ecm_cont::RouteEnergy leg_energy(const Config& config, const Leg& leg, const Weather& weather,
+                                 double entry_speed_kmh, double cruise_speed_kmh, bool end_of_day) {
     auto vehicle = config.vehicle;
     vehicle.Crr *= weather.rolling_multiplier;
-    const auto drive = ecm::drive_energy(vehicle, {
+    const ecm_cont::RouteInput input{{
         leg.distance_km * 1000.0, cruise_speed_kmh / 3.6, entry_speed_kmh / 3.6,
         end_of_day ? 0.0 : cruise_speed_kmh / 3.6, leg.grade_pct / 100.0, weather.headwind_mps,
-    }, config.drivetrain);
-    const double sun_wh = ecm::solar_energy_wh(config.array, leg.clear_sky_w_m2 * weather.solar_factor,
-                                              drive.seconds);
-    return {drive.seconds, drive.demand_wh(), sun_wh};
+    }, leg.clear_sky_w_m2 * weather.solar_factor};
+    const auto energy = config.energy_model(input, vehicle, config.drivetrain, config.array);
+    if (!std::isfinite(energy.seconds) || energy.seconds <= 0.0 || !std::isfinite(energy.net_wh()) ||
+        !std::isfinite(energy.solar_wh) || energy.solar_wh < 0.0) {
+        throw std::runtime_error("ECM returned invalid route energy for " + leg.destination);
+    }
+    return energy;
 }
 
 PacedLeg pace_leg(const Config& config, const Leg& leg, const Weather& weather,
@@ -105,7 +100,7 @@ std::vector<Weather> draw_weather(std::span<const Leg> route, std::mt19937_64& r
 Result simulate(std::span<const Leg> route, std::span<const Weather> weather, const Config& config,
                 Policy policy) {
     if (route.empty() || route.size() != weather.size() || !std::isfinite(config.capacity_wh) ||
-        config.capacity_wh <= 0.0 || !fraction(config.start_soc) || !fraction(config.reserve_soc) ||
+        config.capacity_wh <= 0.0 || !fraction(config.start_soc) || !fraction(config.reserve_soc) || !config.energy_model ||
         !std::isfinite(config.parked_clear_sky_wh_m2) || config.parked_clear_sky_wh_m2 < 0.0) {
         throw std::invalid_argument("invalid route, weather length or storage configuration");
     }
@@ -140,7 +135,7 @@ Result simulate(std::span<const Leg> route, std::span<const Weather> weather, co
         result.distance_km += leg.distance_km * portion;
         result.drive_hours += energy.seconds * portion / 3600.0;
         result.demand_wh += energy.demand_wh * portion;
-        result.solar_wh += energy.sun_wh * portion;
+        result.solar_wh += energy.solar_wh * portion;
         store(-energy.net_wh() * portion);
         if (depleted) {
             result.completed = false;

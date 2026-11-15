@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: YashIsACoder/ecm
-          ref: d03563913647489ae6663bcb94623c912d435bdd
+          ref: ed4642439b28a52c2a19e566d40d20b7fc11297c
           path: ecm
           token: ${{ secrets.ECM_READ_TOKEN }}
           persist-credentials: false

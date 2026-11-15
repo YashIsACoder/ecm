@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <iomanip>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <string_view>
 
@@ -21,8 +22,10 @@ std::uint64_t unsigned_value(std::string_view value) {
 
 void help(std::ostream& output) {
     output << "Usage: solar-race [--route PATH] [--trials N] [--seed N] [--pack-kwh KWH]\n"
+        << "                  [--vehicle reference|sr7|sr8] [--model segment|cycle|mapped]\n"
         << "Writes one CSV row per trial and pacing policy to stdout.\n"
-        << "Defaults: data/outback-2025-style.csv, 2000 trials, seed 2025, 5.5 kWh pack.\n";
+        << "Defaults: outback route, 2000 trials, seed 2025, reference vehicle and segment model.\n"
+        << "--pack-kwh overrides the selected vehicle's usable capacity.\n";
 }
 
 double pack_wh(std::string_view input) {
@@ -42,14 +45,17 @@ int main(int argc, char** argv) {
         std::filesystem::path route_path = "data/outback-2025-style.csv";
         std::uint64_t trials = 2000;
         std::uint64_t seed = 2025;
-        solar_race::Config config;
+        std::string_view vehicle = "reference";
+        std::string_view model = "segment";
+        std::optional<double> capacity;
         for (int i = 1; i < argc; ++i) {
             const std::string_view option = argv[i];
             if (option == "--help" || option == "-h") {
                 help(std::cout);
                 return 0;
             }
-            if (option != "--route" && option != "--trials" && option != "--seed" && option != "--pack-kwh") {
+            if (option != "--route" && option != "--trials" && option != "--seed" && option != "--pack-kwh" &&
+                option != "--vehicle" && option != "--model") {
                 throw std::invalid_argument("unknown option " + std::string(option));
             }
             if (++i == argc) {
@@ -61,7 +67,11 @@ int main(int argc, char** argv) {
             } else if (option == "--trials") {
                 trials = unsigned_value(value);
             } else if (option == "--pack-kwh") {
-                config.capacity_wh = pack_wh(value);
+                capacity = pack_wh(value);
+            } else if (option == "--vehicle") {
+                vehicle = value;
+            } else if (option == "--model") {
+                model = value;
             } else {
                 seed = unsigned_value(value);
             }
@@ -70,6 +80,9 @@ int main(int argc, char** argv) {
             throw std::invalid_argument("at least one trial is required");
         }
 
+        auto config = solar_race::vehicle_config(vehicle);
+        config.energy_model = solar_race::route_energy_model(model);
+        config.capacity_wh = capacity.value_or(config.capacity_wh);
         const auto route = solar_race::read_route(route_path);
         std::mt19937_64 random(seed);
         std::cout << "trial,policy,completed,reserve_breached,distance_km,drive_hours,finish_soc_pct,min_soc_pct,"

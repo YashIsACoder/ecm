@@ -56,4 +56,18 @@ int main() {
     const auto exactly_empty = simulate(short_route, no_sun, flat, Policy::push);
     check(exactly_empty.completed, "arrival with exactly zero charge counts as completion");
     near(exactly_empty.distance_km, 10.0, "entire leg");
+
+    check(vehicle_config("sr7").vehicle.m == 500.0 && vehicle_config("sr8").capacity_wh == 45000.0,
+          "vehicle presets select distinct parameters");
+    flat.start_soc = 1.0;
+    flat.energy_model = route_energy_model("cycle");
+    const auto explicit_ramps = simulate(short_route, no_sun, flat, Policy::steady);
+    check(explicit_ramps.completed && explicit_ramps.drive_hours > 0.25, "cycle model simulates both speed ramps");
+    flat.energy_model = [](const ecm_cont::RouteInput&, const ecm::VehicleParams&,
+                           const ecm::Drivetrain&, const ecm::SolarArray&) {
+        return ecm_cont::RouteEnergy{180.0, 30.0, 5.0};
+    };
+    const auto substituted = simulate(short_route, no_sun, flat, Policy::steady);
+    near(substituted.drive_hours, 0.05, "a custom estimator controls leg duration");
+    near(substituted.finish_soc, 0.75, "a custom estimator feeds the battery update");
 }

@@ -1,9 +1,10 @@
 #pragma once
 
-#include "ecm/segment.hpp"
+#include "ecm_cont/route_energy.hpp"
 
 #include <array>
 #include <filesystem>
+#include <functional>
 #include <random>
 #include <span>
 #include <string>
@@ -28,6 +29,9 @@ struct Weather {
     double park_solar_factor;
 };
 
+using RouteEnergyModel = std::function<ecm_cont::RouteEnergy(
+    const ecm_cont::RouteInput&, const ecm::VehicleParams&, const ecm::Drivetrain&, const ecm::SolarArray&)>;
+
 struct Config {
     ecm::VehicleParams vehicle{
         .rho = 1.18, .Cd = 0.100, .A = 1.0, .m = 225.0, .g = 9.80665, .Crr = 0.0042, .X = 65.0,
@@ -38,7 +42,11 @@ struct Config {
     double start_soc = 0.95;
     double reserve_soc = 0.15;
     double parked_clear_sky_wh_m2 = 2200.0;
+    RouteEnergyModel energy_model = ecm_cont::segment_route_energy;
 };
+
+[[nodiscard]] Config vehicle_config(std::string_view name);
+[[nodiscard]] RouteEnergyModel route_energy_model(std::string_view name);
 
 enum class Policy { steady, push, reserve_first };
 inline constexpr std::array policies{Policy::steady, Policy::push, Policy::reserve_first};
