@@ -61,13 +61,18 @@ void integrate_traction(const ecm::VehicleParams& vehicle, const SpeedInterval& 
                         const ecm::Drivetrain& drivetrain, MapSampling sampling, DriveCycleEnergy& energy) {
     const ecm::Forces forces(vehicle);
     const double acceleration = (interval.final_speed_mps - interval.initial_speed_mps) / interval.seconds;
-    const double constant_force = finite(vehicle.m * acceleration +
-        forces.rolling() * std::cos(std::atan(interval.grade)) + forces.grade(interval.grade));
+    const double rolling = forces.rolling() * std::cos(std::atan(interval.grade));
+    const double climb = forces.grade(interval.grade);
+    const double inertia = vehicle.m * acceleration;
+    const double constant_force = finite(inertia + rolling + climb);
     const double drag_coefficient = finite(0.5 * vehicle.rho * vehicle.Cd * vehicle.A);
     const double wind = interval.headwind_mps;
-    const auto wheel_power = [=](double speed) {
+    const auto drag_force = [=](double speed) {
         const double relative_air = speed + wind;
-        return finite(speed * (constant_force + drag_coefficient * relative_air * std::abs(relative_air)));
+        return drag_coefficient * relative_air * std::abs(relative_air);
+    };
+    const auto wheel_power = [=](double speed) {
+        return finite(speed * (constant_force + drag_force(speed)));
     };
     const auto dc_power = [&](double speed, double wheel) {
         if (wheel < 0.0) {
@@ -81,10 +86,17 @@ void integrate_traction(const ecm::VehicleParams& vehicle, const SpeedInterval& 
 
     const auto [first, last] = std::minmax(interval.initial_speed_mps, interval.final_speed_mps);
     const double hours = interval.seconds / ecm::detail::joules_per_wh;
+    const double distance_per_wh = hours * std::midpoint(first, last);
+    energy.rolling_wh += distance_per_wh * rolling;
+    energy.climb_wh += distance_per_wh * climb;
+    energy.kinetic_wh += distance_per_wh * inertia;
     if (first == last) {
         const double wheel = wheel_power(first);
+        const double dc = dc_power(first, wheel);
         energy.wheel_wh += hours * wheel;
-        energy.traction_wh += hours * dc_power(first, wheel);
+        energy.traction_wh += hours * dc;
+        energy.drag_wh += distance_per_wh * drag_force(first);
+        energy.recovered_wh += hours * std::max(0.0, -dc);
         return;
     }
     if (sampling.efficiency && (last - first) / sampling.max_speed_step_mps > 1'000'000.0) {
@@ -132,9 +144,14 @@ void integrate_traction(const ecm::VehicleParams& vehicle, const SpeedInterval& 
             const double right_speed = std::lerp(left, right, right_node);
             const double left_power = wheel_power(left_speed);
             const double right_power = wheel_power(right_speed);
+            const double left_dc = dc_power(left_speed, left_power);
+            const double right_dc = dc_power(right_speed, right_power);
             energy.wheel_wh += duration_hours * std::midpoint(left_power, right_power);
-            energy.traction_wh += duration_hours *
-                std::midpoint(dc_power(left_speed, left_power), dc_power(right_speed, right_power));
+            energy.traction_wh += duration_hours * std::midpoint(left_dc, right_dc);
+            energy.drag_wh += duration_hours *
+                std::midpoint(left_speed * drag_force(left_speed), right_speed * drag_force(right_speed));
+            energy.recovered_wh += duration_hours *
+                std::midpoint(std::max(0.0, -left_dc), std::max(0.0, -right_dc));
         }
     }
 }
@@ -167,7 +184,10 @@ DriveCycleEnergy evaluate_cycle(const ecm::VehicleParams& vehicle, std::span<con
         previous_speed = interval.final_speed_mps;
     }
     if (!std::isfinite(result.seconds) || !std::isfinite(result.distance_m) ||
-        !std::isfinite(result.wheel_wh) || !std::isfinite(result.net_dc_wh())) {
+        !std::isfinite(result.wheel_wh) || !std::isfinite(result.net_dc_wh()) ||
+        !std::isfinite(result.drag_wh) || !std::isfinite(result.rolling_wh) ||
+        !std::isfinite(result.climb_wh) || !std::isfinite(result.kinetic_wh) ||
+        !std::isfinite(result.recovered_wh)) {
         throw std::overflow_error("drive cycle totals exceed double precision range");
     }
     return result;

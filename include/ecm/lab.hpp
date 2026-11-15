@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <functional>
 #include <iosfwd>
+#include <optional>
 #include <random>
 #include <span>
 #include <string>
@@ -90,6 +91,11 @@ struct LegObservation {
     double demand_wh;
     double parked_wh;
     bool depleted;
+    double elapsed_hours;  // Cumulative driving time, excluding parked time.
+    double depart_soc;  // Charge after any parked solar credit.
+    double spilled_wh;  // Driving and parked energy that exceeded capacity on this leg.
+    double irradiance_w_m2;
+    std::optional<ecm::EnergyBreakdown> components;
 };
 
 using LegSink = std::function<void(const LegObservation&)>;

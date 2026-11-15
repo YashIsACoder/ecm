@@ -40,6 +40,12 @@ P_{\mathrm{traction}}+P_{\mathrm{aux}}-P_{\mathrm{solar}}.
 Power in watts integrated over seconds gives joules. The API reports all
 energy fields in watt-hours and distance in metres.
 
+The solver also reports the integrated work of each force. Rolling, grade
+and inertial work use force times distance on each constant-acceleration
+interval. Signed aerodynamic work uses the quadrature nodes for wheel power.
+Recovered electrical energy is the integral of the magnitude of negative
+traction power after applying regeneration efficiency and the power cap.
+
 ## Integration
 
 On a speed ramp, wheel power as a function of speed is cubic on either side

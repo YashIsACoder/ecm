@@ -22,6 +22,12 @@ int main() {
     const auto cycle = ecm_cont::cycle_route_energy(cruise, vehicle, drivetrain, array);
     near(cycle.seconds, segment.seconds, "same cruising duration");
     near(cycle.net_wh(), segment.net_wh(), "same cruising demand");
+    if (!cycle.components || !segment.components) {
+        throw std::runtime_error("built-in route estimators must report their native energy components");
+    }
+    near(cycle.components->rolling_wh, segment.components->rolling_wh, "same rolling work");
+    near(cycle.components->drag_wh, segment.components->drag_wh, "same aerodynamic work");
+    near(cycle.components->climb_wh, segment.components->climb_wh, "same gravitational work");
 
     const ecm::EfficiencyMap map({0, 100}, {0, 1000}, {0.9, 0.9, 0.9, 0.9});
     const auto mapped = ecm_cont::mapped_route_energy(cruise, vehicle, drivetrain, array, map);

@@ -93,12 +93,24 @@ int main(int argc, char** argv) {
         ecm::lab::TrialTrace trace;
         if (traced_trial) {
             std::cerr << "policy,leg,distance_km,speed_kmh,soc_pct,solar_factor,headwind_mps,rolling_factor,"
-                         "solar_wh,demand_wh,parked_wh,depleted\n" << std::fixed << std::setprecision(6);
+                         "solar_wh,demand_wh,parked_wh,depleted,elapsed_hours,depart_soc_pct,spilled_wh,"
+                         "irradiance_w_m2,drag_wh,rolling_wh,climb_wh,kinetic_wh,traction_wh,auxiliary_wh,"
+                         "recovered_wh\n" << std::fixed << std::setprecision(6);
             trace = {*traced_trial, [](ecm::lab::Policy policy, const ecm::lab::LegObservation& leg) {
                 std::cerr << ecm::lab::policy_name(policy) << ',' << leg.leg << ',' << leg.distance_km << ','
                     << leg.cruise_kmh << ',' << 100.0 * leg.arrive_soc << ',' << leg.weather.solar_factor << ','
                     << leg.weather.headwind_mps << ',' << leg.weather.rolling_multiplier << ',' << leg.solar_wh << ','
-                    << leg.demand_wh << ',' << leg.parked_wh << ',' << leg.depleted << '\n';
+                    << leg.demand_wh << ',' << leg.parked_wh << ',' << leg.depleted << ',' << leg.elapsed_hours << ','
+                    << 100.0 * leg.depart_soc << ',' << leg.spilled_wh << ',' << leg.irradiance_w_m2;
+                if (leg.components) {
+                    const auto& work = *leg.components;
+                    std::cerr << ',' << work.drag_wh << ',' << work.rolling_wh << ',' << work.climb_wh << ','
+                        << work.kinetic_wh << ',' << work.traction_wh << ',' << work.auxiliary_wh << ','
+                        << work.recovered_wh;
+                } else {
+                    std::cerr << ",,,,,,,";
+                }
+                std::cerr << '\n';
             }};
         }
         std::cout << "trial,policy,completed,reserve_breached,distance_km,drive_hours,finish_soc_pct,min_soc_pct,"

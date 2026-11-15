@@ -19,6 +19,7 @@ def test_profile():
     assert math.isclose(result.distance_m, 100.0)
     assert math.isclose(result.wheel_wh, 0.0, abs_tol=1e-12)
     assert math.isclose(result.traction_wh, 7500.0 / 3600.0)
+    assert math.isclose(result.recovered_wh, 5000.0 / 3600.0)
     assert math.isclose(result.auxiliary_wh, 1000.0 / 3600.0)
     assert math.isclose(result.solar_wh, 2.0)
     assert math.isclose(result.net_dc_wh, 13.0 / 36.0)

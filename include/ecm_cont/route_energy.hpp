@@ -2,6 +2,7 @@
 
 #include "ecm_cont/drive_cycle.hpp"
 
+#include <optional>
 #include <vector>
 
 namespace ecm_cont {
@@ -20,6 +21,7 @@ struct RouteEnergy {
     double seconds;
     double demand_wh;  // Signed DC traction plus auxiliaries.
     double solar_wh;
+    std::optional<ecm::EnergyBreakdown> components = std::nullopt;
 
     [[nodiscard]] double net_wh() const noexcept { return demand_wh - solar_wh; }
 };

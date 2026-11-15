@@ -2,7 +2,8 @@
 
 All three C++ adapters take a road segment, plane-of-array irradiance,
 vehicle, drivetrain and array. They return seconds, signed DC demand in
-watt-hours and solar generation in watt-hours. An application can pass any
+watt-hours, solar generation in watt-hours, and an energy breakdown.
+An application can pass any
 adapter into a route simulator with the same result type. Parking and battery
 capacity are managed by the caller.
 
@@ -11,6 +12,11 @@ capacity are managed by the caller.
 | `segment_route_energy` | Cruise with a lumped entry-to-exit kinetic-energy change | Constant |
 | `cycle_route_energy` | Explicit entry and exit speed ramps and a cruise phase | Constant |
 | `mapped_route_energy` | Same speed cycle | Bilinear speed–torque map |
+
+The breakdown records signed drag, rolling, grade and kinetic work at the
+wheels, plus DC traction, auxiliaries and energy recovered by regeneration.
+The reported DC traction already subtracts the recovered energy. A custom
+adapter can omit the component breakdown.
 
 ```cpp
 #include <ecm_cont/route_energy.hpp>

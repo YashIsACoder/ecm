@@ -24,9 +24,18 @@ struct DriveCycleEnergy {
     double traction_wh = 0.0;  // Signed net DC traction energy.
     double auxiliary_wh = 0.0;
     double solar_wh = 0.0;
+    double drag_wh = 0.0;
+    double rolling_wh = 0.0;
+    double climb_wh = 0.0;
+    double kinetic_wh = 0.0;
+    double recovered_wh = 0.0;
 
     [[nodiscard]] double net_dc_wh() const noexcept {
         return traction_wh + auxiliary_wh - solar_wh;
+    }
+
+    [[nodiscard]] ecm::EnergyBreakdown breakdown() const noexcept {
+        return {drag_wh, rolling_wh, climb_wh, kinetic_wh, traction_wh, auxiliary_wh, recovered_wh};
     }
 };
 

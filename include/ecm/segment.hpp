@@ -19,6 +19,18 @@ struct Drivetrain {
     double max_regen_power_w;  // Electrical power recovered at the DC bus.
 };
 
+// Signed mechanical work at the wheels and electrical energy at the DC bus.
+// Recovered energy is a positive magnitude already subtracted from traction.
+struct EnergyBreakdown {
+    double drag_wh;
+    double rolling_wh;
+    double climb_wh;
+    double kinetic_wh;
+    double traction_wh;
+    double auxiliary_wh;
+    double recovered_wh;
+};
+
 struct SegmentEnergy {
     double seconds;
     double drag_wh;
@@ -30,6 +42,7 @@ struct SegmentEnergy {
 
     [[nodiscard]] double wheel_wh() const noexcept;
     [[nodiscard]] double demand_wh() const noexcept;
+    [[nodiscard]] EnergyBreakdown breakdown() const noexcept;
 };
 
 struct SolarArray {

@@ -40,6 +40,7 @@ void start_stop_and_idle() {
     near(cycle.distance_m, 100.0, "linear speed integrates to trapezoidal distance");
     near(cycle.wheel_wh, 0.0, "kinetic-energy gain and loss cancel");
     near(cycle.traction_wh, (10000.0 / 0.8 - 10000.0 * 0.5) / 3600.0, "drivetrain losses remain");
+    near(cycle.recovered_wh, 5000.0 / 3600.0, "DC regeneration is tracked separately from motoring");
     near(cycle.auxiliary_wh, 2500.0 / 3600.0, "auxiliaries draw power while stopped");
 }
 
@@ -59,6 +60,8 @@ void wind_changes_drag_direction() {
     const std::array profile{ecm_cont::SpeedInterval{10.0, 0.0, 10.0, 0.0, -5.0, 0.0}};
     const auto cycle = ecm_cont::drive_cycle(vehicle, profile, {1.0, 1.0, 1000.0});
     near(cycle.wheel_wh, (500.0 + 312.5) / 3600.0, "signed drag changes at zero relative airspeed");
+    near(cycle.drag_wh, 312.5 / 3600.0, "signed drag integral is tracked");
+    near(cycle.kinetic_wh, 500.0 / 3600.0, "inertia integrates to change in kinetic energy");
     near(cycle.traction_wh, cycle.wheel_wh, "lossless, uncapped drivetrain");
 }
 

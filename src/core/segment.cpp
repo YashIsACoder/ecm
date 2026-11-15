@@ -21,6 +21,10 @@ double SegmentEnergy::demand_wh() const noexcept {
     return traction_wh + auxiliary_wh;
 }
 
+EnergyBreakdown SegmentEnergy::breakdown() const noexcept {
+    return {drag_wh, rolling_wh, climb_wh, kinetic_wh, traction_wh, auxiliary_wh, std::max(0.0, -traction_wh)};
+}
+
 SegmentEnergy drive_energy(const VehicleParams& vehicle, const RoadSegment& segment,
                            const Drivetrain& drivetrain) {
     detail::validate_drive(vehicle, drivetrain);

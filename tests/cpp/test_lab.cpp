@@ -75,6 +75,7 @@ int main() {
     const auto first_draw = draw_weather(route, experiment_seed);
     std::size_t rows = 0;
     std::size_t traced_legs = 0;
+    double last_hours = 0.0;
     run_experiment(route, defaults, {2, 42}, [&](const TrialResult& trial) {
         check(trial.trial == rows / policies.size() + 1 && trial.policy == policies[rows % policies.size()],
               "trial numbering and policy order");
@@ -86,6 +87,17 @@ int main() {
     }, {1, [&](Policy, const LegObservation& observation) {
         near(observation.weather.headwind_mps, first_draw[observation.leg].headwind_mps,
              "tracing uses the same wind as the paired draw");
+        if (observation.leg == 0) {
+            last_hours = 0.0;
+            near(observation.depart_soc, defaults.start_soc, "first leg uses starting charge");
+        }
+        check(observation.elapsed_hours > last_hours, "native driving time advances within a policy");
+        near(observation.irradiance_w_m2, route[observation.leg].clear_sky_w_m2 * observation.weather.solar_factor,
+             "trace reports modelled plane-of-array irradiance");
+        check(observation.components.has_value(), "native trace includes energy components");
+        near(observation.components->traction_wh + observation.components->auxiliary_wh, observation.demand_wh,
+             "trace DC demand agrees with the component breakdown");
+        last_hours = observation.elapsed_hours;
         ++traced_legs;
     }});
     check(rows == 2 * policies.size(), "experiment streams all policy outcomes");

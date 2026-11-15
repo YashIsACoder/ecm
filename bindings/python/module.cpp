@@ -97,6 +97,11 @@ PYBIND11_MODULE(ecm, m) {
         .def_readonly("traction_wh", &ecm_cont::DriveCycleEnergy::traction_wh)
         .def_readonly("auxiliary_wh", &ecm_cont::DriveCycleEnergy::auxiliary_wh)
         .def_readonly("solar_wh", &ecm_cont::DriveCycleEnergy::solar_wh)
+        .def_readonly("drag_wh", &ecm_cont::DriveCycleEnergy::drag_wh)
+        .def_readonly("rolling_wh", &ecm_cont::DriveCycleEnergy::rolling_wh)
+        .def_readonly("climb_wh", &ecm_cont::DriveCycleEnergy::climb_wh)
+        .def_readonly("kinetic_wh", &ecm_cont::DriveCycleEnergy::kinetic_wh)
+        .def_readonly("recovered_wh", &ecm_cont::DriveCycleEnergy::recovered_wh)
         .def_property_readonly("net_dc_wh", &ecm_cont::DriveCycleEnergy::net_dc_wh);
 
     m.def("drive_cycle", [](const ecm::VehicleParams& vehicle,

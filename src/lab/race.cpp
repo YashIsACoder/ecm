@@ -121,6 +121,7 @@ Result simulate(std::span<const Leg> route, std::span<const Weather> weather, co
         const auto& conditions = weather[index];
         const bool new_day = index > 0 && leg.day != route[index - 1].day;
         const bool end_of_day = index + 1 == route.size() || leg.day != route[index + 1].day;
+        const double spilled_before = result.spilled_wh;
         double parked_wh = 0.0;
         if (new_day) {
             // A one-hour equivalent irradiance gives the prescribed Wh/m^2 exposure.
@@ -129,6 +130,7 @@ Result simulate(std::span<const Leg> route, std::span<const Weather> weather, co
             result.solar_wh += parked_wh;
             store(parked_wh);
         }
+        const double depart_wh = stored_wh;
         const auto [speed, energy] = pace_leg(config, leg, conditions, policy, stored_wh, entry_kmh, end_of_day);
         const bool depleted = energy.net_wh() > stored_wh;
         // With constant average net draw within a leg, range until depletion is linear.
@@ -139,8 +141,17 @@ Result simulate(std::span<const Leg> route, std::span<const Weather> weather, co
         result.solar_wh += energy.solar_wh * portion;
         store(-energy.net_wh() * portion);
         if (trace) {
+            auto components = energy.components;
+            if (components) {
+                auto& parts = *components;
+                parts = {parts.drag_wh * portion, parts.rolling_wh * portion, parts.climb_wh * portion,
+                         parts.kinetic_wh * portion, parts.traction_wh * portion, parts.auxiliary_wh * portion,
+                         parts.recovered_wh * portion};
+            }
             trace({index, conditions, result.distance_km, speed, stored_wh / config.capacity_wh,
-                   energy.solar_wh * portion, energy.demand_wh * portion, parked_wh, depleted});
+                   energy.solar_wh * portion, energy.demand_wh * portion, parked_wh, depleted,
+                   result.drive_hours, depart_wh / config.capacity_wh, result.spilled_wh - spilled_before,
+                   leg.clear_sky_w_m2 * conditions.solar_factor, components});
         }
         if (depleted) {
             result.completed = false;

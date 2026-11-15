@@ -11,7 +11,7 @@ namespace ecm_cont {
 namespace {
 
 RouteEnergy route_energy(const DriveCycleEnergy& energy) {
-    return {energy.seconds, energy.traction_wh + energy.auxiliary_wh, energy.solar_wh};
+    return {energy.seconds, energy.traction_wh + energy.auxiliary_wh, energy.solar_wh, energy.breakdown()};
 }
 
 }  // namespace
@@ -92,7 +92,8 @@ std::vector<SpeedInterval> route_speed_profile(const RouteInput& input, RampRate
 RouteEnergy segment_route_energy(const RouteInput& input, const ecm::VehicleParams& vehicle,
                                   const ecm::Drivetrain& drivetrain, const ecm::SolarArray& array) {
     const auto energy = ecm::drive_energy(vehicle, input.road, drivetrain);
-    return {energy.seconds, energy.demand_wh(), ecm::solar_energy_wh(array, input.irradiance_w_m2, energy.seconds)};
+    return {energy.seconds, energy.demand_wh(), ecm::solar_energy_wh(array, input.irradiance_w_m2, energy.seconds),
+            energy.breakdown()};
 }
 
 RouteEnergy cycle_route_energy(const RouteInput& input, const ecm::VehicleParams& vehicle,
