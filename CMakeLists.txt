@@ -25,6 +25,7 @@ add_library(ecm STATIC
     src/ecm.cpp
     src/segment.cpp
 )
+add_library(ECM::ecm ALIAS ecm)
 
 target_include_directories(ecm
     PUBLIC
@@ -48,6 +49,7 @@ add_library(ecm_cont STATIC
     src/ecm_cont/dynamics.cpp
     src/ecm_cont/ecm_continuous.cpp
 )
+add_library(ECM::ecm_cont ALIAS ecm_cont)
 
 target_include_directories(ecm_cont
     PUBLIC
@@ -122,9 +124,22 @@ endif()
 # =========================
 # Install
 # =========================
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/ECMConfigVersion.cmake"
+    COMPATIBILITY SameMinorVersion)
+
 install(TARGETS ecm ecm_cont
     EXPORT ECMTargets
     ARCHIVE DESTINATION lib
+)
+
+install(EXPORT ECMTargets
+    FILE ECMConfig.cmake
+    NAMESPACE ECM::
+    DESTINATION lib/cmake/ECM
+)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/ECMConfigVersion.cmake"
+    DESTINATION lib/cmake/ECM
 )
 
 install(DIRECTORY include/

@@ -28,8 +28,8 @@ The library is suitable for **simulations, testing, and research**, and can be p
 **Install via pip (from source):**
 
 ```bash
-git clone <repo_url>
-cd ECM_module
+git clone git@github.com:YashIsACoder/ecm.git
+cd ecm
 pip install .
 ```
 
@@ -65,8 +65,8 @@ energy = model.stint(
     vt=12.0,  # target velocity (m/s)
     t=1.0,    # time period (s)
     wind=0.0, # wind speed (m/s)
-    slope=0.0,# slope angle (radians)
-    S=570     # auxiliary energy offset (W)
+    slope=0.0,# grade as rise divided by horizontal run
+    S=570     # solar power (W)
 )
 
 print("Energy consumed:", energy)
@@ -75,6 +75,19 @@ print("Energy consumed:", energy)
 ---
 
 ## C++ Usage
+
+For a dependency-free C++ build:
+
+```sh
+cmake -S . -B build -DECM_BUILD_PYTHON=OFF -DCMAKE_BUILD_TYPE=Debug
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+cmake --install build --prefix "$PWD/build/install"
+```
+
+Link `ECM::ecm` for the discrete and road-segment APIs or `ECM::ecm_cont` for the continuous model. Both targets are available with `add_subdirectory` and via `find_package(ECM 0.1 CONFIG REQUIRED)` using the install prefix in `CMAKE_PREFIX_PATH`.
+
+### Discrete stint
 
 ```cpp
 #include "ecm/ecm.hpp"
@@ -94,6 +107,25 @@ int main() {
     return 0;
 }
 ```
+
+### Road-segment energy and solar input
+
+`ecm/segment.hpp` provides a speed-and-distance API for batch route experiments. It reuses the library's force calculations and reports motion, traction and auxiliary energy separately, in watt-hours. The segment model cruises at one speed and accounts for net kinetic energy from entry to exit. The drivetrain has separate drive and regeneration efficiencies and a cap on recovered electrical power.
+
+```cpp
+#include <ecm/segment.hpp>
+
+const ecm::VehicleParams car{
+    .rho = 1.2, .Cd = 0.14, .A = 1.0, .m = 200, .Crr = 0.005, .X = 60,
+};
+const ecm::RoadSegment road{36'000, 20, 20, 20, 0, 0};
+const ecm::Drivetrain drivetrain{0.90, 0.55, 100};
+const ecm::SolarArray array{4, 0.20, 0.90};
+const auto drive = ecm::drive_energy(car, road, drivetrain);
+const double net_draw_wh = drive.demand_wh() - ecm::solar_energy_wh(array, 1000, drive.seconds);
+```
+
+A positive grade is rise divided by horizontal run (`0.01` is a 1% climb). Positive wind opposes travel. For the segment API, the library reports solar separately from vehicle demand so a caller can apply its own battery storage limits. The existing `stint()` APIs return joules.
 
 ---
 
@@ -142,6 +174,6 @@ cd build
 
 ## License
 
-MIT License — see LICENSE file.
+See the [MIT License](LICENSE.md).
 
 
