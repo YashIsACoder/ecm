@@ -59,8 +59,10 @@ are repeatable on the same build. Standard-library normal draws can differ
 across toolchains.
 
 The local browser adapter runs the CLI with bounded trial counts and sends the
-same results and one native leg trace to the frontend. The browser animates
-that trace and shows the log for each policy. The homepage build reads a
+same results and one native leg trace to the frontend. The browser interpolates
+the cars' positions and battery charge between native leg observations on a
+shared driving-time clock. It displays native wheel and DC changes, and reports
+confidence intervals for finish and reserve outcomes. The homepage build reads a
 recorded native JSON result with route and binary hashes. It uses the same
 replay controls and can be served directly from a static site.
 

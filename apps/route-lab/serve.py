@@ -13,6 +13,7 @@ import subprocess
 from bisect import bisect_left
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from itertools import accumulate
 from pathlib import Path
 from threading import BoundedSemaphore
 from urllib.parse import urlsplit
@@ -26,7 +27,9 @@ ROUTE_FILES = {"outback": "outback-2025-style.csv", "rolling": "rolling-1150.csv
 ASSETS = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/lab.css": ("lab.css", "text/css; charset=utf-8"),
-    "/lab.js": ("lab.js", "text/javascript; charset=utf-8"),
+    "/lab.mjs": ("lab.mjs", "text/javascript; charset=utf-8"),
+    "/map-data.mjs": ("map-data.mjs", "text/javascript; charset=utf-8"),
+    "/replay.mjs": ("replay.mjs", "text/javascript; charset=utf-8"),
     "/demo.json": ("demo.json", "application/json"),
 }
 MAX_TRIALS = 3000
@@ -66,8 +69,13 @@ def run_case(executable: Path, request: dict) -> dict:
     args, route, count = experiment_arguments(request)
     with route.open(newline="", encoding="utf-8") as route_file:
         route_rows = list(csv.DictReader(route_file))
-    route_points = [{"day": int(leg["day"]), "name": leg["destination"]} for leg in route_rows]
-    length = math.fsum(float(leg["distance_km"]) for leg in route_rows)
+    checkpoints = list(accumulate(float(leg["distance_km"]) for leg in route_rows))
+    route_points = [
+        {"day": int(leg["day"]), "name": leg["destination"], "km": km, "grade_pct": float(leg["grade_pct"]),
+         "pace_cap_kmh": float(leg["pace_cap_kmh"])}
+        for leg, km in zip(route_rows, checkpoints)
+    ]
+    length = checkpoints[-1]
     completed = subprocess.run([executable, *args], capture_output=True, text=True, check=True, timeout=15)
     cases = read_trial_stream(io.StringIO(completed.stdout), "solar-race")
     if len(cases) != count or min(cases) != 1 or max(cases) != count:
@@ -83,15 +91,27 @@ def run_case(executable: Path, request: dict) -> dict:
             raise RuntimeError("The simulator omitted route distances.")
         reached = [(count - bisect_left(lengths, point)) / count for point in distances[:-1]]
         reached.append(len(times) / count)
+        breaches = sum(trial.reserve_breached for trial in trials)
+        metrics = {}
+        for name_of_metric in ("finish_soc_pct", "min_soc_pct", "demand_kwh", "solar_kwh", "spilled_kwh"):
+            values = [getattr(trial, name_of_metric) for trial in trials]
+            if any(value is None for value in values):
+                raise RuntimeError(f"The simulator omitted {name_of_metric}.")
+            metrics[name_of_metric] = statistics.median(values)
         policies.append({
             "name": name, "finishes": len(times), "completion_ci": wilson(len(times), count),
-            "reserve_breaches": sum(trial.reserve_breached for trial in trials),
+            "reserve_breaches": breaches, "reserve_ci": wilson(breaches, count),
             "median_hours": statistics.median(times) if times else None,
-            "route_reach": reached,
+            "route_reach": reached, "diagnostics": {"distance_km": statistics.median(lengths), **metrics},
         })
     comparisons = {
         name: paired_difference((trial[name].completed, trial["steady"].completed) for trial in cases.values())
         for name in POLICIES[1:]
+    }
+    reserve_comparisons = {
+        name: paired_difference(
+            (trial[name].reserve_breached, trial["steady"].reserve_breached) for trial in cases.values()
+        ) for name in POLICIES[1:]
     }
     logs = {name: [] for name in POLICIES}
     for row in csv.DictReader(io.StringIO(completed.stderr)):
@@ -101,13 +121,19 @@ def run_case(executable: Path, request: dict) -> dict:
         leg = int(row.pop("leg"))
         if leg != len(logs[name]) or leg >= len(route_points):
             raise ValueError("Unexpected route index in the native leg trace.")
-        logs[name].append({"leg": leg, **{key: float(value) for key, value in row.items()}})
+        observation = {key: float(value) if value else None for key, value in row.items()}
+        previous = logs[name][-1] if leg else {"elapsed_hours": 0.0, "distance_km": 0.0}
+        if (not all(value is None or math.isfinite(value) for value in observation.values()) or
+                any(observation[key] is None or observation[key] < previous[key]
+                    for key in ("elapsed_hours", "distance_km"))):
+            raise ValueError("Invalid driving time or distance in the native trace.")
+        logs[name].append({"leg": leg, **observation})
     if any(not events for events in logs.values()):
         raise ValueError("The native simulator omitted the requested leg trace.")
     return {
         "trials": count, "distances_km": distances, "policies": policies,
-        "completion_vs_steady": comparisons, "csv": completed.stdout,
-        "trace": {"draw": request.get("trace_trial", 1), "points": route_points, "logs": logs,
+        "completion_vs_steady": comparisons, "reserve_vs_steady": reserve_comparisons, "csv": completed.stdout,
+        "trace": {"draw": request.get("trace_trial", 1), "route": request["route"], "points": route_points, "logs": logs,
                   "csv": completed.stderr},
     }
 

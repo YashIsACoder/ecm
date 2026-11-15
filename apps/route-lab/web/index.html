@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sunswift Route Lab</title>
   <link rel="stylesheet" href="./lab.css">
-  <script src="./lab.js" defer></script>
+  <script src="./lab.mjs" type="module"></script>
 </head>
 <body>
   <header class="top"><span class="mark" aria-hidden="true"></span><span>ECM / SUNSWIFT ROUTE LAB</span></header>
@@ -71,7 +71,7 @@
           <div class="table-wrap">
             <table>
               <thead>
-                <tr><th scope="col">Strategy</th><th scope="col">Finish rate <span>95% interval</span></th><th scope="col">Below reserve</th><th scope="col">Median finish time</th></tr>
+                <tr><th scope="col">Strategy</th><th scope="col">Finish rate <span>95% interval</span></th><th scope="col">Below reserve <span>95% interval</span></th><th scope="col">Median finish time</th></tr>
               </thead>
               <tbody id="summary"></tbody>
             </table>
@@ -85,6 +85,24 @@
             <canvas id="reach" role="img" aria-label="Share of trials reaching each distance for the three pacing strategies. Finish rates are in the table above."></canvas>
           </div>
           <p class="comparison" id="comparison"></p>
+          <details class="diagnostics">
+            <summary>All trial diagnostics and paired intervals</summary>
+            <div class="table-wrap">
+              <table>
+                <caption>Difference from steady · 95% paired interval</caption>
+                <thead><tr><th scope="col">Strategy</th><th scope="col">Finish rate</th><th scope="col">Below reserve</th></tr></thead>
+                <tbody id="paired"></tbody>
+              </table>
+              <table>
+                <caption>Median across all simulated trials</caption>
+                <thead>
+                  <tr><th scope="col">Strategy</th><th scope="col">Distance</th><th scope="col">Final charge</th>
+                  <th scope="col">Min. charge</th><th scope="col">DC demand</th><th scope="col">Solar</th><th scope="col">Spill</th></tr>
+                </thead>
+                <tbody id="trial-diagnostics"></tbody>
+              </table>
+            </div>
+          </details>
         </div>
       </section>
     </div>
@@ -101,11 +119,29 @@
       </ol>
       <div class="timeline">
         <button type="button" id="play" class="play">Play replay</button>
-        <label for="leg" class="sr-only">Route leg</label>
-        <input id="leg" type="range" min="0" max="0" value="0">
+        <label for="leg" class="sr-only">Driving time</label>
+        <input id="leg" type="range" min="0" max="0" step="any" value="0">
         <output id="leg-label" for="leg"></output>
       </div>
-      <div id="lanes" class="lanes"></div>
+      <div class="race-dashboard">
+        <figure class="map-card">
+          <div class="panel-heading">
+            <h3 id="route-map-heading">Route map</h3>
+            <span id="map-kind"></span>
+          </div>
+          <canvas id="route-map" role="img" aria-label="Animated Sunswift-style cars positioned along the simulated route. Each strategy’s distance and charge are shown alongside."></canvas>
+          <figcaption id="map-caption"></figcaption>
+        </figure>
+        <div class="battery-card">
+          <div class="panel-heading"><h3>Battery through the draw</h3><span>15% reserve</span></div>
+          <canvas id="battery" role="img" aria-label="State of charge by driving time for the three strategies, with a dashed 15 percent reserve line."></canvas>
+          <div id="policy-readouts" class="policy-readouts" aria-label="Select a strategy to inspect"></div>
+        </div>
+      </div>
+      <section class="energy-card" aria-labelledby="energy-heading">
+        <div class="panel-heading"><h3 id="energy-heading">Leg energy breakdown</h3><span id="energy-place"></span></div>
+        <div id="energy-breakdown"></div>
+      </section>
       <div class="log-head">
         <h3>Native leg log</h3>
         <label for="log-policy" class="sr-only">Log strategy</label>

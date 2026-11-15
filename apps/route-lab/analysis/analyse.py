@@ -20,6 +20,11 @@ class Trial:
     reserve_breached: bool
     drive_hours: float
     distance_km: Optional[float] = None
+    finish_soc_pct: Optional[float] = None
+    min_soc_pct: Optional[float] = None
+    demand_kwh: Optional[float] = None
+    solar_kwh: Optional[float] = None
+    spilled_kwh: Optional[float] = None
 
 
 def bit(value: str) -> bool:
@@ -31,6 +36,15 @@ def bit(value: str) -> bool:
 def read_trials(path: Path) -> dict[int, dict[str, Trial]]:
     with path.open(newline="", encoding="utf-8") as file:
         return read_trial_stream(file, str(path))
+
+
+def optional_number(row: dict, column: str) -> Optional[float]:
+    if column not in row:
+        return None
+    value = float(row[column])
+    if not math.isfinite(value):
+        raise ValueError(f"invalid {column}")
+    return value
 
 
 def read_trial_stream(file: TextIO, source: str) -> dict[int, dict[str, Trial]]:
@@ -45,15 +59,20 @@ def read_trial_stream(file: TextIO, source: str) -> dict[int, dict[str, Trial]]:
             number = int(row["trial"])
             policy = row["policy"]
             hours = float(row["drive_hours"])
-            distance = float(row["distance_km"]) if "distance_km" in columns else None
+            distance = optional_number(row, "distance_km")
             if number <= 0 or policy not in POLICIES or not math.isfinite(hours) or hours < 0:
                 raise ValueError("invalid trial, policy or driving time")
-            if distance is not None and (not math.isfinite(distance) or distance < 0):
+            if distance is not None and distance < 0:
                 raise ValueError("invalid distance")
             group = by_trial.setdefault(number, {})
             if policy in group:
                 raise ValueError(f"duplicate policy {policy} in trial {number}")
-            group[policy] = Trial(bit(row["completed"]), bit(row["reserve_breached"]), hours, distance)
+            group[policy] = Trial(
+                bit(row["completed"]), bit(row["reserve_breached"]), hours, distance,
+                optional_number(row, "finish_soc_pct"), optional_number(row, "min_soc_pct"),
+                optional_number(row, "demand_kwh"), optional_number(row, "solar_kwh"),
+                optional_number(row, "spilled_kwh"),
+            )
         except (TypeError, ValueError) as error:
             raise ValueError(f"{source}:{rows.line_num}: {error}") from error
     if not by_trial:

@@ -20,7 +20,11 @@ def main() -> None:
             with urlopen(url + "/?replay=1", timeout=5) as page:
                 assert page.status == 200
             with urlopen(url + "/demo.json", timeout=5) as response:
-                assert json.load(response)["result"]["trace"]["draw"] == 6
+                demo = json.load(response)["result"]
+                assert demo["trace"]["draw"] == 6 and demo["trace"]["route"] == "outback"
+                assert "elapsed_hours" in demo["trace"]["logs"]["steady"][0]
+            with urlopen(url + "/replay.mjs", timeout=5) as asset:
+                assert asset.headers.get_content_type() == "text/javascript"
 
             request = {"route": "rolling", "vehicle": "sr8", "model": "mapped",
                        "trials": 8, "seed": "42", "trace_trial": 3}
@@ -32,6 +36,12 @@ def main() -> None:
             first = [events[0]["headwind_mps"] for events in result["trace"]["logs"].values()]
             assert len(set(first)) == 1
             assert result["distances_km"][-1] == 1150
+            assert result["trace"]["points"][-1]["km"] == 1150
+            assert len(result["policies"][0]["reserve_ci"]) == 2
+            assert len(result["reserve_vs_steady"]["push"]) == 3
+            trace = result["trace"]["logs"]["steady"][0]
+            assert abs(trace["traction_wh"] + trace["auxiliary_wh"] - trace["demand_wh"]) < 3e-6
+            assert trace["elapsed_hours"] > 0 and trace["rolling_wh"] > 0
 
             request["trace_trial"] = 9
             rejected = Request(url + "/api/run", json.dumps(request).encode(), {"Content-Type": "application/json"})

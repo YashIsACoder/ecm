@@ -1,5 +1,8 @@
 "use strict";
 
+import { routes } from "./map-data.mjs";
+import { drawBattery, drawRouteMap, policyStyles, traceAt } from "./replay.mjs";
+
 const form = document.querySelector("#experiment");
 const run = document.querySelector("#run");
 const status = document.querySelector("#status");
@@ -18,7 +21,16 @@ const play = document.querySelector("#play");
 const leg = document.querySelector("#leg");
 const legLabel = document.querySelector("#leg-label");
 const drawLabel = document.querySelector("#draw-label");
-const lanes = document.querySelector("#lanes");
+const readouts = document.querySelector("#policy-readouts");
+const map = document.querySelector("#route-map");
+const battery = document.querySelector("#battery");
+const mapHeading = document.querySelector("#route-map-heading");
+const mapKind = document.querySelector("#map-kind");
+const mapCaption = document.querySelector("#map-caption");
+const paired = document.querySelector("#paired");
+const diagnostics = document.querySelector("#trial-diagnostics");
+const energyPlace = document.querySelector("#energy-place");
+const energyBreakdown = document.querySelector("#energy-breakdown");
 const logPolicy = document.querySelector("#log-policy");
 const traceLog = document.querySelector("#trace-log");
 const traceTrial = document.querySelector("#trace-trial");
@@ -29,15 +41,10 @@ const numbers = new Intl.NumberFormat("en-AU", { maximumFractionDigits: 0 });
 
 const labels = { steady: "Steady", push: "Push", "reserve-first": "Reserve-first" };
 const presets = { reference: "5.5", sr7: "38", sr8: "45" };
-const series = [
-  { color: "--teal", dash: [] },
-  { color: "--rust", dash: [7, 4] },
-  { color: "--blue", dash: [2, 4] },
-];
-
 let current;
 let busy = false;
 let timer;
+let historyKey;
 
 const percent = (value) => `${(100 * value).toFixed(1)}%`;
 const pointDelta = (value) => {
@@ -55,18 +62,43 @@ function addCell(row, value, note) {
   }
 }
 
+function namedRow(table, name) {
+  const row = table.insertRow();
+  const label = document.createElement("th");
+  label.scope = "row";
+  label.textContent = labels[name];
+  row.append(label);
+  return row;
+}
+
+function addPairedCell(row, values) {
+  const [estimate, low, high] = values.map(pointDelta);
+  addCell(row, `${estimate} pp`, `${low} to ${high} pp`);
+}
+
 function render(data, settings, recorded = false) {
   current = data;
   summary.replaceChildren();
+  paired.replaceChildren();
+  diagnostics.replaceChildren();
   for (const policy of data.policies) {
-    const row = summary.insertRow();
-    const name = document.createElement("th");
-    name.scope = "row";
-    name.textContent = labels[policy.name];
-    row.append(name);
+    const row = namedRow(summary, policy.name);
     addCell(row, percent(policy.finishes / data.trials), policy.completion_ci.map(percent).join("–"));
-    addCell(row, percent(policy.reserve_breaches / data.trials));
+    addCell(row, percent(policy.reserve_breaches / data.trials), policy.reserve_ci.map(percent).join("–"));
     addCell(row, policy.median_hours === null ? "—" : `${policy.median_hours.toFixed(2)} h`);
+    const metrics = policy.diagnostics;
+    const diagnosticRow = namedRow(diagnostics, policy.name);
+    addCell(diagnosticRow, `${numbers.format(metrics.distance_km)} km`);
+    addCell(diagnosticRow, `${metrics.finish_soc_pct.toFixed(1)}%`);
+    addCell(diagnosticRow, `${metrics.min_soc_pct.toFixed(1)}%`);
+    for (const key of ["demand_kwh", "solar_kwh", "spilled_kwh"]) {
+      addCell(diagnosticRow, `${metrics[key].toFixed(2)} kWh`);
+    }
+    if (policy.name !== "steady") {
+      const pairedRow = namedRow(paired, policy.name);
+      addPairedCell(pairedRow, data.completion_vs_steady[policy.name]);
+      addPairedCell(pairedRow, data.reserve_vs_steady[policy.name]);
+    }
   }
   const [delta, low, high] = data.completion_vs_steady["reserve-first"].map(pointDelta);
   comparison.textContent =
@@ -119,9 +151,9 @@ function drawChart() {
     ctx.fillText(numbers.format(distance), x(distance), bottom + 12);
   }
   ctx.fillText("Distance (km)", (left + right) / 2, height - 7);
-  current.policies.forEach((policy, index) => {
-    ctx.strokeStyle = color(series[index].color);
-    ctx.setLineDash(series[index].dash);
+  current.policies.forEach((policy) => {
+    ctx.strokeStyle = color(policyStyles[policy.name].color);
+    ctx.setLineDash(policyStyles[policy.name].dash);
     ctx.lineWidth = 2;
     ctx.beginPath();
     policy.route_reach.forEach((share, point) => {
@@ -139,57 +171,80 @@ function drawChart() {
 function resetReplay() {
   pauseReplay();
   replay.hidden = false;
-  const { draw, logs } = current.trace;
+  historyKey = undefined;
+  const { draw, logs, route } = current.trace;
+  const mapRoute = routes[route];
+  mapHeading.textContent = mapRoute.title;
+  mapKind.textContent = mapRoute.geographic ? "CORRIDOR MAP" : "SCHEMATIC";
+  mapCaption.textContent = mapRoute.geographic
+    ? "Approximate checkpoints on the synthetic course. Coastline by Natural Earth."
+    : "Illustrative layout for the fictional rolling-country route.";
   drawLabel.textContent = `DRAW ${draw} OF ${numbers.format(current.trials)}`;
-  leg.max = Math.max(...Object.values(logs).map((events) => events.length - 1));
+  leg.max = Math.max(1e-6, ...Object.values(logs).map((events) => events.at(-1).elapsed_hours));
   leg.value = 0;
-  lanes.replaceChildren();
+  readouts.replaceChildren();
   for (const name of Object.keys(labels)) {
-    const row = document.createElement("div");
-    row.className = "lane";
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "policy-readout";
     row.dataset.policy = name;
     const label = document.createElement("span");
-    label.className = "lane-label";
     label.textContent = labels[name];
-    const track = document.createElement("div");
-    track.className = "lane-track";
-    track.setAttribute("aria-hidden", "true");
-    const fill = document.createElement("div");
-    fill.className = "lane-fill";
-    track.append(fill);
-    const meta = document.createElement("span");
-    meta.className = "lane-meta";
-    row.append(label, track, meta);
-    lanes.append(row);
+    const meta = document.createElement("small");
+    row.append(label, meta);
+    row.addEventListener("click", () => {
+      logPolicy.value = name;
+      renderReplay();
+    });
+    readouts.append(row);
   }
-  renderLeg();
+  renderReplay();
 }
 
-function renderLeg() {
-  const step = Number(leg.value);
-  const { points, logs } = current.trace;
-  const total = current.distances_km.at(-1);
-  legLabel.textContent = `Leg ${step + 1} of ${points.length}`;
+function renderReplay() {
+  if (!current || replay.hidden) return;
+  const hour = Number(leg.value);
+  const horizon = Number(leg.max);
+  const selected = logPolicy.value;
+  const positions = Object.fromEntries(
+    Object.entries(current.trace.logs).map(([name, events]) => [name, traceAt(events, hour)]),
+  );
+  legLabel.textContent = `${hour.toFixed(1)} / ${horizon.toFixed(1)} driving h`;
   leg.setAttribute("aria-valuetext", legLabel.textContent);
-  for (const row of lanes.children) {
-    const events = logs[row.dataset.policy];
-    const event = events[Math.min(step, events.length - 1)];
-    row.querySelector(".lane-fill").style.width = `${Math.min(100, 100 * event.distance_km / total)}%`;
-    row.querySelector(".lane-meta").textContent =
-      `${numbers.format(event.distance_km)} km · ${event.depleted ? "depleted" : `${event.soc_pct.toFixed(0)}% SOC`}`;
+  for (const row of readouts.children) {
+    const state = positions[row.dataset.policy];
+    row.setAttribute("aria-pressed", String(row.dataset.policy === selected));
+    const charge = state.depleted ? "depleted" : `${state.soc.toFixed(0)}% SOC`;
+    row.lastElementChild.textContent = `${numbers.format(state.distance)} km · ${charge}${state.done && !state.depleted ? " · finished" : ""}`;
   }
-  const events = logs[logPolicy.value].slice(0, step + 1);
+  drawRouteMap(map, current.trace, positions, selected);
+  drawBattery(battery, current.trace.logs, hour, horizon, positions);
+  const key = `${selected}-${positions[selected].reached}`;
+  if (key === historyKey) return;
+  historyKey = key;
+  renderHistory(current.trace, selected, positions[selected].reached);
+}
+
+function renderHistory({ points, logs }, selected, count) {
+  const events = logs[selected].slice(0, count);
   traceLog.replaceChildren();
+  renderEnergy(points, events.at(-1));
+  if (!events.length) {
+    const item = document.createElement("li");
+    item.textContent = "Advance through the draw to log each completed leg.";
+    traceLog.append(item);
+  }
   for (const event of events) {
     const point = points[event.leg];
     const item = document.createElement("li");
     item.classList.toggle("depleted", Boolean(event.depleted));
     const heading = document.createElement("strong");
-    heading.textContent = `Day ${point.day} · ${event.depleted ? "Stopped before " : ""}${point.name}`;
+    heading.textContent = `${event.elapsed_hours.toFixed(2)} h · Day ${point.day} · ${event.depleted ? "Stopped before " : ""}${point.name}`;
     const details = document.createElement("span");
     const parked = event.parked_wh ? ` · parked solar ${(event.parked_wh / 1000).toFixed(2)} kWh` : "";
     details.textContent = `${event.speed_kmh.toFixed(0)} km/h target · ${event.soc_pct.toFixed(1)}% SOC · ` +
-      `solar ${percent(event.solar_factor)} of clear sky · signed headwind ${event.headwind_mps.toFixed(1)} m/s · ` +
+      `${event.irradiance_w_m2.toFixed(0)} W/m² · solar ${percent(event.solar_factor)} of clear sky · ` +
+      `headwind ${event.headwind_mps.toFixed(1)} m/s · grade ${point.grade_pct.toFixed(2)}% · ` +
       `rolling ×${event.rolling_factor.toFixed(2)} · DC draw ${(event.demand_wh / 1000).toFixed(2)} kWh · ` +
       `driving solar ${(event.solar_wh / 1000).toFixed(2)} kWh${parked}`;
     item.append(heading, details);
@@ -198,8 +253,52 @@ function renderLeg() {
   traceLog.scrollTop = traceLog.scrollHeight;
 }
 
+function energyList(title, terms) {
+  const section = document.createElement("div");
+  const heading = document.createElement("h4");
+  heading.textContent = title;
+  const list = document.createElement("dl");
+  for (const [name, value] of terms) {
+    const label = document.createElement("dt");
+    label.textContent = name;
+    const amount = document.createElement("dd");
+    amount.textContent = value === null ? "—" : Math.abs(value) < 100
+      ? `${Math.abs(value) < .05 ? "0.0" : value.toFixed(1)} Wh`
+      : `${(value / 1000).toFixed(2)} kWh`;
+    list.append(label, amount);
+  }
+  section.append(heading, list);
+  return section;
+}
+
+function renderEnergy(points, event) {
+  energyBreakdown.replaceChildren();
+  if (!event) {
+    energyPlace.textContent = labels[logPolicy.value];
+    energyBreakdown.textContent = "Play or scrub past the first leg to see its energy balance.";
+    return;
+  }
+  energyPlace.textContent = `${labels[logPolicy.value]} · ${points[event.leg].name}`;
+  const wheels = [
+    ["Aerodynamic drag", event.drag_wh], ["Rolling resistance", event.rolling_wh],
+    ["Gravity / grade", event.climb_wh], ["Kinetic-energy change", event.kinetic_wh],
+  ];
+  const work = wheels.map(([, value]) => value);
+  wheels.push(["Net wheel work", work.every(Number.isFinite) ? work.reduce((sum, value) => sum + value, 0) : null]);
+  const known = event.traction_wh !== null && event.recovered_wh !== null;
+  const dc = [
+    ["Motoring draw", known ? event.traction_wh + event.recovered_wh : null],
+    ["Regeneration credit", known ? -event.recovered_wh : null],
+    ["Auxiliaries", event.auxiliary_wh], ["DC demand", event.demand_wh],
+    ["Driving solar credit", -event.solar_wh],
+    ["Parked solar credit", -event.parked_wh], ["Energy spilled", event.spilled_wh],
+    ["Net battery draw", event.demand_wh - event.solar_wh - event.parked_wh + event.spilled_wh],
+  ];
+  energyBreakdown.append(energyList("At the wheels", wheels), energyList("DC and battery", dc));
+}
+
 function pauseReplay() {
-  clearInterval(timer);
+  cancelAnimationFrame(timer);
   timer = undefined;
   play.textContent = "Play replay";
 }
@@ -211,19 +310,26 @@ function toggleReplay() {
   }
   if (Number(leg.value) === Number(leg.max)) {
     leg.value = 0;
-    renderLeg();
+    renderReplay();
   }
   if (Number(leg.max) === 0) {
     return;
   }
   play.textContent = "Pause replay";
-  timer = setInterval(() => {
-    leg.value = Number(leg.value) + 1;
-    renderLeg();
-    if (Number(leg.value) === Number(leg.max)) {
+  const start = performance.now();
+  const from = Number(leg.value);
+  const end = Number(leg.max);
+  const advance = (now) => {
+    const hours = Math.min(end, from + (now - start) * end / 20_000);
+    leg.value = hours;
+    renderReplay();
+    if (hours === end) {
       pauseReplay();
+    } else {
+      timer = requestAnimationFrame(advance);
     }
-  }, 735);
+  };
+  timer = requestAnimationFrame(advance);
 }
 
 async function loadRecorded() {
@@ -317,9 +423,12 @@ document.querySelector("#download-trace").addEventListener("click", () => {
 play.addEventListener("click", toggleReplay);
 leg.addEventListener("input", () => {
   pauseReplay();
-  renderLeg();
+  renderReplay();
 });
-logPolicy.addEventListener("change", renderLeg);
+logPolicy.addEventListener("change", renderReplay);
 
 new ResizeObserver(drawChart).observe(chart);
+const replayResize = new ResizeObserver(renderReplay);
+replayResize.observe(map);
+replayResize.observe(battery);
 runExperiment();

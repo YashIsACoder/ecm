@@ -21,9 +21,21 @@ python3 apps/route-lab/serve.py build/bin/solar-race
 ```
 
 Open `http://127.0.0.1:8765`. Run an experiment, then play or scrub the
-selected draw. Each strategy uses the same weather in that draw. The track
-and log show the distance reached, the chosen pace, state of charge and how
-much solar energy was collected. Download either the trial CSV or the leg trace.
+selected draw. The cars share a driving-time clock and split when their
+strategies choose different paces. Select a car's strategy to see its latest
+leg's wheel work, DC and battery balance, and native log. Download either the
+trial CSV or the leg trace.
+
+The route marker and state of charge are interpolated between native leg
+observations for replay. The clock excludes parked time and applies each parked
+solar credit at the start of the next driving leg. The outback map connects
+approximate checkpoints. Rolling country uses a schematic.
+[Bridgestone World Solar Challenge corridor](https://worldsolarchallenge.org/about-us/route-map) ·
+[Natural Earth coastline](https://www.naturalearthdata.com/about/terms-of-use/)
+
+Finish and reserve-breach rates show 95% Wilson intervals. Expand the trial
+diagnostics to see paired intervals versus Steady, alongside median distance,
+charge, demand, solar and spill.
 
 ## Use the demo on a homepage
 

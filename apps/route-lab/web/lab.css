@@ -82,6 +82,9 @@ thead th:first-child, tbody th { padding-left: 0; }
 .legend .reserve { border-top: 2px dotted var(--blue); }
 canvas { display: block; width: 100%; height: 215px; }
 .comparison { margin-top: .45rem; font-size: .84rem; line-height: 1.48; }
+.diagnostics { margin-top: .85rem; padding-bottom: 0; }
+.diagnostics table { margin-top: .8rem; }
+caption { text-align: left; color: var(--muted); font: .74rem var(--mono); margin-bottom: .22rem; }
 .replay { margin-top: 1rem; padding: clamp(1rem, 2.6vw, 1.55rem); background: var(--sheet); border: 1px solid var(--line); }
 .pipeline { display: flex; flex-wrap: wrap; gap: .35rem .8rem; padding: 0; margin: 0 0 1rem; list-style: none; }
 .pipeline li { font: .73rem var(--mono); color: var(--muted); }
@@ -90,17 +93,29 @@ canvas { display: block; width: 100%; height: 215px; }
 .timeline input { margin: 0; accent-color: var(--teal); }
 .timeline output { font: .76rem var(--mono); text-align: right; }
 .play { min-width: 7.8rem; font-size: .84rem; }
-.lanes { display: grid; gap: .8rem; margin: 1.05rem 0 1.25rem; }
-.lane { display: grid; grid-template-columns: 6rem minmax(0,1fr) 9rem; gap: .65rem; align-items: center; }
-.lane-label { font-weight: 650; font-size: .82rem; }
-.lane-meta { font: .72rem var(--mono); text-align: right; color: var(--muted); white-space: nowrap; }
-.lane-track { height: 8px; position: relative; background: #263c31; margin: 0 5px; }
-.lane-fill { height: 100%; width: 0; transition: width 480ms cubic-bezier(.2,.75,.3,1); background: currentColor; }
-.lane-fill::after { content: ""; display: block; float: right; width: 13px; height: 10px; margin: -1px -5px 0 0;
-  border-radius: 6px 6px 3px 3px; background: currentColor; box-shadow: 0 0 10px currentColor; }
-.lane[data-policy="steady"] { color: var(--teal); }
-.lane[data-policy="push"] { color: var(--rust); }
-.lane[data-policy="reserve-first"] { color: var(--blue); }
+.race-dashboard { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr); gap: .8rem; margin: 1rem 0; }
+.map-card, .battery-card, .energy-card { min-width: 0; background: var(--field); border: 1px solid var(--line); margin: 0; }
+.panel-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .3rem .8rem; padding: .85rem .9rem .4rem; }
+.panel-heading h3 { font-size: .98rem; }
+.panel-heading span, .map-card figcaption { color: var(--muted); font: .68rem/1.5 var(--mono); }
+#route-map { height: clamp(285px,32vw,365px); }
+.map-card figcaption { padding: .1rem .9rem .72rem; }
+#battery { height: 205px; }
+.policy-readouts { display: grid; gap: .35rem; padding: 0 .75rem .75rem; }
+.policy-readout {
+  display: flex; align-items: center; justify-content: space-between; gap: .35rem .65rem;
+  border: 1px solid var(--line); background: transparent; text-align: left; font-size: .77rem;
+}
+.policy-readout[aria-pressed="true"] { background: #22382d; border-color: currentColor; }
+.policy-readout small { color: var(--ink); font: .66rem var(--mono); text-align: right; }
+.policy-readout[data-policy="steady"] { color: var(--teal); }
+.policy-readout[data-policy="push"] { color: var(--rust); }
+.policy-readout[data-policy="reserve-first"] { color: var(--blue); }
+.energy-card { margin: 0 0 1rem; }
+#energy-breakdown { display: grid; grid-template-columns: 1fr 1.2fr; gap: .8rem 1.4rem; padding: .2rem .9rem .85rem; color: var(--muted); font-size: .8rem; }
+#energy-breakdown h4 { margin: .18rem 0 .35rem; color: var(--ink); font-size: .77rem; }
+#energy-breakdown dl { margin: 0; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: .25rem .7rem; }
+#energy-breakdown dd { margin: 0; text-align: right; font: .71rem/1.45 var(--mono); color: var(--ink); }
 .log-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: .55rem; }
 .log-head h3 { font-size: .98rem; }
 .log-head select { width: auto; margin-bottom: 0; min-height: 38px; }
@@ -118,6 +133,7 @@ details p { margin-top: .68rem; max-width: 75ch; color: var(--muted); line-heigh
   .workspace { grid-template-columns: 1fr; }
   .intro { grid-template-columns: 1fr; }
   .solar-grid { display: none; }
+  .race-dashboard { grid-template-columns: 1fr; }
   .settings { width: 100%; }
   form { display: grid; grid-template-columns: 1fr; }
   th, td { padding-right: .45rem; padding-left: .45rem; }
@@ -126,10 +142,5 @@ details p { margin-top: .68rem; max-width: 75ch; color: var(--muted); line-heigh
 @media (max-width: 490px) {
   .timeline { grid-template-columns: auto 1fr; }
   .timeline output { grid-column: 1 / -1; text-align: left; }
-  .lane { grid-template-columns: 5.35rem minmax(0,1fr); }
-  .lane-meta { grid-column: 2; text-align: left; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .lane-fill { transition: none; }
+  #energy-breakdown { grid-template-columns: 1fr; }
 }
