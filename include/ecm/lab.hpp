@@ -24,6 +24,7 @@ struct Leg {
     double grade_pct;
     double clear_sky_w_m2;
     double pace_cap_kmh;
+    double control_minutes = 0.0;  // Stationary hold after arriving at this waypoint.
 };
 
 struct Weather {
@@ -47,6 +48,7 @@ struct Config {
     double reserve_soc = 0.15;
     double parked_clear_sky_wh_m2 = 2200.0;
     RouteEnergyModel energy_model = ecm_cont::segment_route_energy;
+    bool race_schedule = false;
 };
 
 [[nodiscard]] Config vehicle_config(std::string_view name);
@@ -66,11 +68,15 @@ struct Result {
     double demand_wh = 0.0;
     double solar_wh = 0.0;
     double spilled_wh = 0.0;
+    double race_hours = 0.0;
 };
+
+enum class WeatherModel { baseline, posterior };
 
 struct Experiment {
     std::uint64_t trials = 2000;
     std::uint64_t seed = 2025;
+    WeatherModel weather = WeatherModel::baseline;
 };
 
 struct TrialResult {
@@ -96,6 +102,10 @@ struct LegObservation {
     double spilled_wh;  // Driving and parked energy that exceeded capacity on this leg.
     double irradiance_w_m2;
     std::optional<ecm::EnergyBreakdown> components;
+    double race_depart_hours;
+    double race_arrive_hours;
+    double control_hours;
+    double overnight_hours;
 };
 
 using LegSink = std::function<void(const LegObservation&)>;

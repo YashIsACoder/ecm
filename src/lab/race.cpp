@@ -120,7 +120,13 @@ Result simulate(std::span<const Leg> route, std::span<const Weather> weather, co
         const auto& leg = route[index];
         const auto& conditions = weather[index];
         const bool new_day = index > 0 && leg.day != route[index - 1].day;
-        const bool end_of_day = index + 1 == route.size() || leg.day != route[index + 1].day;
+        const bool final_leg = index + 1 == route.size();
+        const bool overnight = !final_leg && leg.day != route[index + 1].day;
+        const bool control_stop = config.race_schedule && !final_leg && leg.control_minutes > 0.0;
+        if (config.race_schedule && (!std::isfinite(leg.control_minutes) || leg.control_minutes < 0.0)) {
+            throw std::invalid_argument("invalid control stop duration");
+        }
+        const bool stop_at_end = final_leg || overnight || control_stop;
         const double spilled_before = result.spilled_wh;
         double parked_wh = 0.0;
         if (new_day) {
@@ -131,12 +137,20 @@ Result simulate(std::span<const Leg> route, std::span<const Weather> weather, co
             store(parked_wh);
         }
         const double depart_wh = stored_wh;
-        const auto [speed, energy] = pace_leg(config, leg, conditions, policy, stored_wh, entry_kmh, end_of_day);
+        const double race_depart = result.race_hours;
+        const auto [speed, energy] = pace_leg(config, leg, conditions, policy, stored_wh, entry_kmh, stop_at_end);
         const bool depleted = energy.net_wh() > stored_wh;
         // With constant average net draw within a leg, range until depletion is linear.
         const double portion = depleted ? stored_wh / energy.net_wh() : 1.0;
         result.distance_km += leg.distance_km * portion;
-        result.drive_hours += energy.seconds * portion / 3600.0;
+        const double driving = energy.seconds * portion / 3600.0;
+        result.drive_hours += driving;
+        const double race_arrive = race_depart + driving;
+        const double control = control_stop && !depleted ? leg.control_minutes / 60.0 : 0.0;
+        const double race_after_control = race_arrive + control;
+        const double off_duty = config.race_schedule && overnight && !depleted
+            ? std::max(0.0, 24.0 * (route[index + 1].day - 1) - race_after_control) : 0.0;
+        result.race_hours = race_after_control + off_duty;
         result.demand_wh += energy.demand_wh * portion;
         result.solar_wh += energy.solar_wh * portion;
         store(-energy.net_wh() * portion);
@@ -151,13 +165,14 @@ Result simulate(std::span<const Leg> route, std::span<const Weather> weather, co
             trace({index, conditions, result.distance_km, speed, stored_wh / config.capacity_wh,
                    energy.solar_wh * portion, energy.demand_wh * portion, parked_wh, depleted,
                    result.drive_hours, depart_wh / config.capacity_wh, result.spilled_wh - spilled_before,
-                   leg.clear_sky_w_m2 * conditions.solar_factor, components});
+                   leg.clear_sky_w_m2 * conditions.solar_factor, components,
+                   race_depart, race_arrive, control, off_duty});
         }
         if (depleted) {
             result.completed = false;
             break;
         }
-        entry_kmh = end_of_day ? 0.0 : speed;
+        entry_kmh = stop_at_end ? 0.0 : speed;
     }
 
     result.finish_soc = stored_wh / config.capacity_wh;

@@ -82,6 +82,7 @@ std::vector<Leg> read_route(std::istream& input, std::string_view source_name) {
     constexpr std::array<std::string_view, 6> columns{
         "day", "destination", "distance_km", "grade_pct", "clear_sky_w_m2", "pace_cap_kmh",
     };
+    bool timed_stops = false;
     try {
         std::getline(input, line);
         trim_cr(line);
@@ -90,7 +91,12 @@ std::vector<Leg> read_route(std::istream& input, std::string_view source_name) {
         if (header.starts_with(utf8_bom)) {
             header.remove_prefix(utf8_bom.size());
         }
-        if (!std::ranges::equal(fields(header), columns)) {
+        auto names = fields(header);
+        if (names.size() == columns.size() + 1 && names.back() == "control_minutes") {
+            timed_stops = true;
+            names.pop_back();
+        }
+        if (!std::ranges::equal(names, columns)) {
             throw std::runtime_error("unexpected route CSV header");
         }
     } catch (const std::runtime_error& error) {
@@ -107,8 +113,8 @@ std::vector<Leg> read_route(std::istream& input, std::string_view source_name) {
         }
         try {
             auto values = fields(line);
-            if (values.size() != 6 || values[1].empty()) {
-                throw std::runtime_error("expected six fields and a destination");
+            if (values.size() != columns.size() + timed_stops || values[1].empty()) {
+                throw std::runtime_error("route row does not match the header or has an empty destination");
             }
             const double day = number(values[0]);
             const int previous_day = route.empty() ? 0 : route.back().day;
@@ -118,7 +124,10 @@ std::vector<Leg> read_route(std::istream& input, std::string_view source_name) {
                 throw std::runtime_error("days must start at 1 and be consecutive");
             }
             Leg leg{static_cast<int>(day), std::move(values[1]), number(values[2]), number(values[3]),
-                    number(values[4]), number(values[5])};
+                    number(values[4]), number(values[5]), timed_stops ? number(values[6]) : 0.0};
+            if (leg.control_minutes < 0.0) {
+                throw std::runtime_error("control stop minutes must be nonnegative");
+            }
             if (leg.distance_km <= 0.0 || std::abs(leg.grade_pct) > 100.0 ||
                 leg.clear_sky_w_m2 < 0.0 || leg.pace_cap_kmh <= 0.0) {
                 throw std::runtime_error("distance and pace cap must be positive; grade and irradiance must be valid");

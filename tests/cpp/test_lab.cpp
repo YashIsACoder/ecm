@@ -1,3 +1,4 @@
+#include "ecm/forecast.hpp"
 #include "ecm/lab.hpp"
 
 #include <algorithm>
@@ -37,6 +38,52 @@ int main() {
         near(result.finish_soc * defaults.capacity_wh,
              defaults.start_soc * defaults.capacity_wh + result.solar_wh - result.demand_wh - result.spilled_wh,
              "energy accounting includes parked solar and spill");
+    }
+
+    auto staged = route;
+    staged[0].control_minutes = 30.0;
+    staged.back().control_minutes = 30.0;
+    auto schedule = defaults;
+    schedule.race_schedule = true;
+    std::vector<LegObservation> timetable;
+    const auto scheduled = simulate(staged, weather, schedule, Policy::steady,
+                                    [&](const LegObservation& leg) { timetable.push_back(leg); });
+    check(scheduled.completed && timetable.size() == 3, "scheduled route finishes");
+    near(timetable[0].race_depart_hours, 0.0, "race starts at zero elapsed hours");
+    near(timetable[0].control_hours, 0.5, "control holds for 30 minutes");
+    near(timetable[1].race_depart_hours, timetable[0].race_arrive_hours + 0.5, "clock includes control hold");
+    near(timetable[2].race_depart_hours, 24.0, "next morning at the same local time");
+    near(timetable[1].overnight_hours, 24.0 - timetable[1].race_arrive_hours, "overnight wait is timestamped");
+    near(timetable.back().control_hours, 0.0, "finish line does not hold the car");
+    near(scheduled.race_hours, timetable.back().race_arrive_hours, "race duration ends at final arrival");
+    check(scheduled.race_hours > scheduled.drive_hours, "elapsed race time includes holds and waits");
+
+    const auto residuals = synthetic_weather_residuals();
+    const auto forecast = calibrate_forecast(residuals, 2025);
+    const auto rerun = calibrate_forecast(residuals, 2025);
+    double solar_mean = 0.0, wind_mean = 0.0;
+    const auto sample_count = static_cast<double>(forecast.chains.size() * forecast.chains.front().samples.size());
+    for (std::size_t c = 0; c < forecast.chains.size(); ++c) {
+        const auto& chain = forecast.chains[c];
+        check(chain.samples.size() == 1600 && chain.acceptance > .2 && chain.acceptance < .6,
+              "forecast retains the requested samples and accepts well-scaled steps");
+        near(chain.samples.back().solar, rerun.chains[c].samples.back().solar, "forecast calibration is seeded");
+        for (const auto bias : chain.samples) {
+            solar_mean += bias.solar / sample_count;
+            wind_mean += bias.wind_mps / sample_count;
+        }
+    }
+    check(std::abs(solar_mean - forecast.solar_exact.mean) < .012 &&
+          std::abs(wind_mean - forecast.wind_exact.mean) < .15, "MCMC means agree with the conjugate posterior");
+    check(forecast.split_rhat.solar < 1.06 && forecast.split_rhat.wind_mps < 1.06,
+          "split chains agree on the synthetic calibration");
+    std::mt19937_64 weather_random(19);
+    const auto predicted = draw_forecast_weather(route, forecast, weather_random);
+    check(predicted.size() == route.size(), "predictive draw covers the route");
+    near(predicted[0].park_solar_factor, predicted[1].park_solar_factor, "predictions reuse daily conditions");
+    for (const auto& conditions : predicted) {
+        check(conditions.solar_factor >= .25 && conditions.solar_factor <= 1.0 &&
+              std::isfinite(conditions.headwind_mps), "forecast stays within physical input bounds");
     }
 
     const std::array short_route{Leg{1, "Finish", 10.0, 0.0, 0.0, 40.0}};

@@ -1,4 +1,5 @@
 #include "ecm/lab.hpp"
+#include "ecm/forecast.hpp"
 #include "default_route.hpp"
 
 #include <sstream>
@@ -21,8 +22,13 @@ void run_experiment(std::span<const Leg> route, const Config& config,
     }
 
     std::mt19937_64 random(experiment.seed);
+    std::optional<ForecastCalibration> calibration;
+    if (experiment.weather == WeatherModel::posterior) {
+        calibration = calibrate_forecast(synthetic_weather_residuals(), experiment.seed);
+    }
     for (std::uint64_t trial = 0; trial < experiment.trials; ++trial) {
-        const auto weather = draw_weather(route, random);
+        const auto weather = calibration ? draw_forecast_weather(route, *calibration, random)
+                                         : draw_weather(route, random);
         for (const auto policy : policies) {
             if (trace.sink && trace.trial == trial + 1) {
                 sink({trial + 1, policy, simulate(route, weather, config, policy, [&](const LegObservation& leg) {

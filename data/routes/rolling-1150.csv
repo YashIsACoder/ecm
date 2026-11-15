@@ -1,10 +1,10 @@
-day,destination,distance_km,grade_pct,clear_sky_w_m2,pace_cap_kmh
-1,Foothills,120,0.31,620,85
-1,High plain,155,0.12,730,95
-1,West camp,110,-0.26,480,80
-2,River crossing,105,-0.21,510,85
-2,Open road,165,0.05,810,100
-2,Ridge camp,110,0.29,590,85
-3,Long descent,130,-0.31,630,90
-3,Salt plain,145,0.08,760,100
-3,Finish,110,-0.08,560,85
+day,destination,distance_km,grade_pct,clear_sky_w_m2,pace_cap_kmh,control_minutes
+1,Foothills,120,0.31,620,85,0
+1,High plain,155,0.12,730,95,30
+1,West camp,110,-0.26,480,80,0
+2,River crossing,105,-0.21,510,85,0
+2,Open road,165,0.05,810,100,30
+2,Ridge camp,110,0.29,590,85,0
+3,Long descent,130,-0.31,630,90,0
+3,Salt plain,145,0.08,760,100,30
+3,Finish,110,-0.08,560,85,0
