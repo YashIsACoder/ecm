@@ -4,7 +4,7 @@
 
 - **Steady** targets 82 km/h.
 - **Push** targets 92 km/h.
-- **Reserve-first** chooses 92 or 85 km/h if the current leg's estimated draw leaves at least 35% state of charge. Otherwise it uses 75 km/h. It observes conditions for the current leg and has no future weather. Every policy applies the leg's synthetic pace cap.
+- **Reserve-first** chooses 92 or 85 km/h if the current leg's estimated draw leaves at least 35% state of charge. Otherwise it uses 75 km/h. It observes conditions for the current leg. Choose the [route energy envelope](pacing.md) to budget charge for upcoming checkpoints. Every policy applies the leg's pace cap after the road-wetness adjustment.
 
 A paired trial draws conditions once, then runs all three policies on that draw. This keeps differences attributable to the pacing rules within the model. The example uses independent draws across trials. Cloud and wind share a per-day random component, with smaller leg-to-leg variation. Rolling resistance gets a small independent perturbation at each leg. Route distance, grade and clear-sky irradiance come from the checked-in [synthetic fixture](../../../data/routes/README.md). Choose baseline weather or the [posterior predictive model](forecast.md). Both use synthetic assumptions.
 

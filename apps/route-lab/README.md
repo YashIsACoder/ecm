@@ -20,35 +20,39 @@ ctest --test-dir build --output-on-failure
 python3 apps/route-lab/serve.py build/bin/solar-race
 ```
 
-Open `http://127.0.0.1:8765`. Play or scrub the selected draw. **Next REST**
-jumps to the inspected strategy's next control stop. The shared race clock
-starts at 08:00. Cars stop for 30 minutes at marked controls and park until the
-next 08:00 at route day boundaries. Playback gives holds extra screen time and
-speeds through stretches when all cars are off course.
+Open `http://127.0.0.1:8765` and expand **Experiment setup** to choose the
+route, ECM variant, battery, speed targets, solar array, and weather stressors.
+**Run experiment** returns to the map. **Race outcomes** opens the same run's
+finish and reserve intervals, reach chart, battery history, and speed history.
 
-Select a strategy to see its current leg's irradiance and wind, plus the last
-completed leg's wheel work, DC and battery balance, and native log. Download
-the trial CSV or leg trace. The browser interpolates position and state of
-charge using native leg endpoints. The outback map connects approximate
-checkpoints. Rolling country uses a schematic.
-[Bridgestone World Solar Challenge corridor](https://worldsolarchallenge.org/about-us/route-map) ·
+Choose 0.5×, 1×, 2× or 4× playback. **Race highlights** gives control holds more
+screen time and speeds through shared overnight parking. **Uniform time scale**
+plays the simulated clock at a constant rate. **Next REST** jumps to the
+selected strategy's next 30-minute control stop.
+
+Select a strategy to see mean leg speed, target speed, generated solar power,
+irradiance, wind, rain, wetness and wet-road pace cap. As a leg completes, the
+native trace exposes its wheel work, DC and battery balance. Position and charge
+interpolate using native leg endpoints.
+[BWSC corridor](https://worldsolarchallenge.org/about-us/route-map) ·
 [Natural Earth coastline](https://www.naturalearthdata.com/about/terms-of-use/)
 
-The lab defaults to posterior predictive weather. Open **Forecast methods** to
-scrub the native Metropolis chains and compare the sampled bias to the exact
-Gaussian posterior. Both weather modes use synthetic inputs.
-See the [forecast implementation notes](docs/forecast.md).
+**Save run setup** exports versioned JSON with settings, CLI arguments and a
+route SHA-256. Use **Load setup JSON** in the setup panel to rerun the case. From
+the repository root the exported `arguments` array can also be passed directly
+to `solar-race` using the same build. The local HTTP adapter only serves bundled
+route fixtures. Supply any compatible [route CSV](../../data/routes/README.md)
+with the native CLI.
 
-Finish and reserve-breach rates show 95% Wilson intervals. Expand the trial
-diagnostics to see paired intervals versus Steady, alongside median distance,
-charge, demand, solar and spill.
+See the [forecast model](docs/forecast.md) for MCMC and rain, and the
+[pacing algorithm and comparison](docs/pacing.md) for the route energy envelope.
 
 ## Use the demo on a homepage
 
 Copy the contents of [`web/`](web/) into a static site directory and link to
 that directory with `?replay=1`. The page loads a recorded native SR7 experiment
-with interactive playback. The selected draw lets visitors see both a finish
-and a depletion on the same route. New experiments run through the local lab.
+with interactive playback and a separate analytics page. The selected draw
+shows a rainy control stop, a finish and pack depletion. New experiments run through the local lab.
 To regenerate the recorded data after rebuilding, run
 
 ```sh
@@ -78,14 +82,16 @@ For one scenario, use the simulator directly.
 mkdir -p runs
 build/bin/solar-race --vehicle sr7 --model mapped \
   --route data/routes/outback-2025-style.csv --trials 2000 --seed 2025 \
-  --race-schedule --weather posterior > runs/sr7.csv
+  --race-schedule --weather posterior --rain-multiplier 0.65 \
+  --reserve-strategy envelope --reserve-target-pct 15 --reserve-slow-kmh 65 > runs/sr7.csv
 python3 apps/route-lab/analysis/analyse.py runs/sr7.csv
 ```
 
 Add `--trace-trial 15` to write one draw's leg log to stderr while the regular
 CSV stays on stdout. Redirect stderr to a trace file when working from a shell.
 `--race-schedule` adds control and overnight waits to a separate elapsed-time
-column. The default command uses baseline weather and driving-time results.
+column. The default CLI uses baseline weather, dry roads and driving-time
+results. The browser defaults to posterior weather with rain intensity 0.65.
 
 The binary embeds the default outback fixture, so it runs from any working
 directory without a `--route` argument. Supply `--route PATH` for your own
@@ -105,3 +111,5 @@ Every backend returns duration, DC demand and solar generation.
 and [reference outback experiment](docs/outback-results.md).
 
 The [system design](../../docs/architecture.md) shows how the lab fits into ECM.
+
+[Résumé and personal-site copy](docs/portfolio.md)

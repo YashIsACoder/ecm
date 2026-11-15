@@ -41,7 +41,7 @@ plus package metadata.
 ## Simulation flow
 
 1. Parse each route leg into distance, fractional grade, irradiance and cruise cap. Select the vehicle preset and ECM backend.
-2. Select the baseline weather generator or calibrate a posterior once per experiment. Draw weather once for each trial and pass it to every policy. [Forecast model](../apps/route-lab/docs/forecast.md)
+2. Select baseline or posterior weather, and precompute any route energy envelope once. Draw weather and optional showers once per trial and pass them to all policies. [Forecast model](../apps/route-lab/docs/forecast.md) · [Pacing algorithm](../apps/route-lab/docs/pacing.md)
 3. Call the selected estimator with the state-independent inputs for each candidate pace. It returns seconds, signed DC demand and solar generation. Reuse the chosen estimate for the battery update.
 4. Apply capacity, reserve, depletion and optional control schedules in the lab. Emit one CSV row per trial and pacing rule.
 5. Run the same seed across vehicle and model cases. Python validates trial IDs, pairs equivalent rows, and records the input and executable hashes.
@@ -63,11 +63,13 @@ The local browser adapter runs the CLI with bounded trial counts and sends the
 same results and one native leg trace to the frontend. The browser interpolates
 the cars' positions and battery charge between native leg observations, using
 the native race clock for starts, control holds and overnight parking. Weather
-readouts switch as the selected strategy enters each leg. The browser displays
-wheel and DC changes and reports confidence intervals for finish and reserve
-outcomes. The homepage build uses the same replay controls and reads a recorded
-native result with route and binary hashes. The methods page reads a separate
-CLI calibration report. Both pages can be served from a static site.
+readouts switch as the selected strategy enters each leg. The map includes
+expandable configuration and per-leg telemetry. The separate analytics page
+uses the same run and race time. A tab can reuse the most recent run from
+session storage. Shareable query parameters can also reconstruct a case on
+the local server. The static homepage replay uses a recorded native run with
+route and binary hashes. The methods page reads a separate CLI calibration
+report.
 
 ## Extension points
 

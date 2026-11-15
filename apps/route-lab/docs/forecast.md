@@ -48,3 +48,26 @@ clock uses one schedule without time-zone transitions.
 The checked-in example uses synthetic residuals and provisional values for
 noise and persistence. Forecasts for an actual race would require measured
 residuals, independent calibration and forecast verification.
+
+## Precipitation and road state
+
+An optional separate seeded stream generates a stationary AR(1) rain front
+with persistence 0.72. Lower sampled solar factors favour rain onset.
+For front state `z`, unadjusted solar fraction `s` and rain multiplier `m`,
+the simulated intensity in mm/h is
+`clamp(7.5 × m × (z + 2.2 × (0.75 − s) − 0.60), 0, 40)`.
+The multiplier spans 0 to 2. At 0 the existing dry sequence is unchanged.
+Solar and wind stress factors can be varied separately.
+
+Road wetness follows `dW/dx = (W_eq − W) / L` with
+`W_eq = rain / (4 + rain)`. Each leg applies the exact exponential update.
+`L` is 35 km in rain and 115 km when dry. The leg uses the mean of its entry
+and exit wetness. This route-coordinate approximation carries wetness across
+checkpoints and avoids treating driver pace as a weather input.
+
+A wet road multiplies rolling resistance by `1 + 0.14W` and reduces the pace
+cap by `1 − 0.14W`. Rain multiplies driving and parked irradiance by
+`1 − 0.35 × rain/(5 + rain)` after the scenario solar adjustment.
+The leg trace records rainfall, wetness and effective pace cap. All coefficients
+are synthetic scenario values. The browser's sky labels describe attenuation
+and rain in the current simulated leg.
