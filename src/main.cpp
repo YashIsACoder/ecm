@@ -1,6 +1,7 @@
 #include "solar_race/race.hpp"
 
 #include <charconv>
+#include <cmath>
 #include <cstdint>
 #include <iomanip>
 #include <iostream>
@@ -19,9 +20,19 @@ std::uint64_t unsigned_value(std::string_view value) {
 }
 
 void help(std::ostream& output) {
-    output << "Usage: solar-race [--route PATH] [--trials N] [--seed N]\n"
+    output << "Usage: solar-race [--route PATH] [--trials N] [--seed N] [--pack-kwh KWH]\n"
         << "Writes one CSV row per trial and pacing policy to stdout.\n"
-        << "Defaults: data/outback-2025-style.csv, 2000 trials, seed 2025.\n";
+        << "Defaults: data/outback-2025-style.csv, 2000 trials, seed 2025, 5.5 kWh pack.\n";
+}
+
+double pack_wh(std::string_view input) {
+    const std::string value(input);
+    std::size_t end = 0;
+    const double capacity_wh = 1000.0 * std::stod(value, &end);
+    if (end != value.size() || !std::isfinite(capacity_wh) || capacity_wh <= 0.0) {
+        throw std::invalid_argument("pack capacity must be a positive finite number of kWh");
+    }
+    return capacity_wh;
 }
 
 }  // namespace
@@ -31,13 +42,14 @@ int main(int argc, char** argv) {
         std::filesystem::path route_path = "data/outback-2025-style.csv";
         std::uint64_t trials = 2000;
         std::uint64_t seed = 2025;
+        solar_race::Config config;
         for (int i = 1; i < argc; ++i) {
             const std::string_view option = argv[i];
             if (option == "--help" || option == "-h") {
                 help(std::cout);
                 return 0;
             }
-            if (option != "--route" && option != "--trials" && option != "--seed") {
+            if (option != "--route" && option != "--trials" && option != "--seed" && option != "--pack-kwh") {
                 throw std::invalid_argument("unknown option " + std::string(option));
             }
             if (++i == argc) {
@@ -48,6 +60,8 @@ int main(int argc, char** argv) {
                 route_path = value;
             } else if (option == "--trials") {
                 trials = unsigned_value(value);
+            } else if (option == "--pack-kwh") {
+                config.capacity_wh = pack_wh(value);
             } else {
                 seed = unsigned_value(value);
             }
@@ -57,7 +71,6 @@ int main(int argc, char** argv) {
         }
 
         const auto route = solar_race::read_route(route_path);
-        const solar_race::Config config;
         std::mt19937_64 random(seed);
         std::cout << "trial,policy,completed,reserve_breached,distance_km,drive_hours,finish_soc_pct,min_soc_pct,"
                      "demand_kwh,solar_kwh,spilled_kwh\n" << std::fixed << std::setprecision(6);
