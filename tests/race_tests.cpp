@@ -42,7 +42,8 @@ int main() {
     const std::array short_route{Leg{1, "Finish", 10.0, 0.0, 0.0, 40.0}};
     const std::array no_sun{Weather{0.0, 0.0, 1.0, 0.0}};
     Config flat;
-    flat.vehicle = {200.0, 0.0, 0.0, 1.0, 0.0, 0.0, 100.0};
+    flat.vehicle = {.Cd = 0.0, .m = 200.0, .Crr = 0.0, .X = 100.0};
+    flat.drivetrain = {1.0, 0.0, 0.0};
     flat.capacity_wh = 100.0;
     flat.start_soc = 0.125;
     const auto depleted = simulate(short_route, no_sun, flat, Policy::steady);

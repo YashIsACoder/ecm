@@ -18,14 +18,13 @@ struct LegEnergy {
 LegEnergy leg_energy(const Config& config, const Leg& leg, const Weather& weather,
                      double entry_speed_kmh, double cruise_speed_kmh, bool end_of_day) {
     auto vehicle = config.vehicle;
-    vehicle.rolling_coefficient *= weather.rolling_multiplier;
-    const auto drive = solar_ecm::drive_energy(vehicle, {
+    vehicle.Crr *= weather.rolling_multiplier;
+    const auto drive = ecm::drive_energy(vehicle, {
         leg.distance_km * 1000.0, cruise_speed_kmh / 3.6, entry_speed_kmh / 3.6,
         end_of_day ? 0.0 : cruise_speed_kmh / 3.6, leg.grade_pct / 100.0, weather.headwind_mps,
-        1.18,
-    });
-    const double sun_wh = solar_ecm::solar_energy_wh(config.array, leg.clear_sky_w_m2 * weather.solar_factor,
-                                                     drive.seconds);
+    }, config.drivetrain);
+    const double sun_wh = ecm::solar_energy_wh(config.array, leg.clear_sky_w_m2 * weather.solar_factor,
+                                              drive.seconds);
     return {drive.seconds, drive.demand_wh(), sun_wh};
 }
 
@@ -115,7 +114,7 @@ Result simulate(std::span<const Leg> route, std::span<const Weather> weather, co
         const bool end_of_day = index + 1 == route.size() || leg.day != route[index + 1].day;
         if (new_day) {
             // A one-hour equivalent irradiance gives the prescribed Wh/m^2 exposure.
-            const double parked_wh = solar_ecm::solar_energy_wh(
+            const double parked_wh = ecm::solar_energy_wh(
                 config.array, config.parked_clear_sky_wh_m2 * conditions.park_solar_factor, 3600.0);
             result.solar_wh += parked_wh;
             store(parked_wh);

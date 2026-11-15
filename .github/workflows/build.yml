@@ -15,11 +15,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: simulator
+          persist-credentials: false
       - uses: actions/checkout@v4
         with:
-          repository: ${{ github.repository_owner }}/solar-ecm-cpp
-          ref: 401ca52b5f310cdfb4d0c044c5ff273dab0e84d3
-          path: solar-ecm-cpp
+          repository: YashIsACoder/ecm
+          ref: d03563913647489ae6663bcb94623c912d435bdd
+          path: ecm
+          token: ${{ secrets.ECM_READ_TOKEN }}
+          persist-credentials: false
       - working-directory: simulator
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release

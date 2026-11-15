@@ -1,6 +1,6 @@
 # Solar race Monte Carlo
 
-Should a solar car hold its pace or back off when its battery reserve starts falling? This project puts three pacing rules through the same weather draws on a simplified 3,020 km Darwin–Adelaide route. The C++ simulator calls [Solar ECM](https://github.com/YashIsACoder/solar-ecm-cpp) for traction demand and solar generation. A Python script summarises the paired trials.
+Should a solar car hold its pace or back off when its battery reserve starts falling? This project puts three pacing rules through the same weather draws on a simplified 3,020 km Darwin–Adelaide route. The C++ simulator calls the road-segment and array APIs in [ECM](https://github.com/YashIsACoder/ecm) for traction demand and solar generation. A Python script summarises the paired trials.
 
 I adapted this project from the Monte Carlo race-strategy work I did with **Sunswift Racing**. This standalone implementation uses a 2025 Bridgestone World Solar Challenge–inspired route and synthetic vehicle, terrain and weather inputs. See [the route notes](data/README.md) and [model assumptions](docs/model.md).
 
@@ -14,7 +14,7 @@ Results above used seed `2025`, a 5.5 kWh synthetic pack, and an Apple Clang 17 
 
 ## Run it
 
-Put the two checkouts next to each other, or pass `-DSOLAR_ECM_SOURCE_DIR=/path/to/solar-ecm-cpp`. The build also accepts an installed ECM package via `CMAKE_PREFIX_PATH`.
+Put a checkout of the private [ECM library](https://github.com/YashIsACoder/ecm/tree/solar-race-integration) alongside this repository, or pass `-DECM_SOURCE_DIR=/path/to/ecm`. The build also accepts an installed ECM package via `CMAKE_PREFIX_PATH`. GitHub Actions pins the ECM commit and requires an `ECM_READ_TOKEN` repository secret with read access to ECM contents. The example chart and results can be read without an ECM checkout.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release

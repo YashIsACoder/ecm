@@ -1,6 +1,6 @@
 #pragma once
 
-#include "solar_ecm/energy.hpp"
+#include "ecm/segment.hpp"
 
 #include <array>
 #include <filesystem>
@@ -29,8 +29,11 @@ struct Weather {
 };
 
 struct Config {
-    solar_ecm::Vehicle vehicle{225.0, 0.100, 0.0042, 0.92, 0.60, 1400.0, 65.0};
-    solar_ecm::SolarArray array{6.0, 0.24, 0.92};
+    ecm::VehicleParams vehicle{
+        .rho = 1.18, .Cd = 0.100, .A = 1.0, .m = 225.0, .g = 9.80665, .Crr = 0.0042, .X = 65.0,
+    };
+    ecm::Drivetrain drivetrain{0.92, 0.60, 1400.0};
+    ecm::SolarArray array{6.0, 0.24, 0.92};
     double capacity_wh = 5500.0;
     double start_soc = 0.95;
     double reserve_soc = 0.15;
