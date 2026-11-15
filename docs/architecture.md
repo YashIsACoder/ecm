@@ -14,6 +14,9 @@ flowchart LR
     Energy --> Lab
     Lab --> CSV["Trial CSV"]
     CSV --> Analysis["Python report and run manifest"]
+    Lab --> Trace["Optional native leg trace"]
+    Trace --> Browser["Browser replay and leg log"]
+    Analysis --> Browser
 ```
 
 ## Components
@@ -25,7 +28,7 @@ flowchart LR
 | `src/detail` | Shared internal validation and unit conventions |
 | `bindings/python` | pybind11 bindings for the C++ library |
 | `include/ecm/lab.hpp`, `src/lab` | Reusable route parser, scenario presets, policy engine, and paired Monte Carlo driver |
-| `apps/route-lab` | Command-line client and Python analysis |
+| `apps/route-lab` | Command-line client, Python analysis, local browser adapter and standalone replay assets |
 | `tests` | Native model tests, Python binding tests, and an installed-package consumer |
 
 `ECM::ecm_cont` links `ECM::ecm`. The bindings and the lab both use the
@@ -54,6 +57,12 @@ memory. Runtime grows with the number of trials, policies, legs and estimator
 work. The experiment runner retains parsed cases for pairing. Seeded results
 are repeatable on the same build. Standard-library normal draws can differ
 across toolchains.
+
+The local browser adapter runs the CLI with bounded trial counts and sends the
+same results and one native leg trace to the frontend. The browser animates
+that trace and shows the log for each policy. The homepage build reads a
+recorded native JSON result with route and binary hashes. It uses the same
+replay controls and can be served directly from a static site.
 
 ## Extension points
 

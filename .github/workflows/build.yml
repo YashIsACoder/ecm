@@ -26,6 +26,7 @@ jobs:
             "-Dpybind11_DIR=$(python -m pybind11 --cmakedir)"
           cmake --build build --parallel
           ctest --test-dir build --output-on-failure
+          python apps/route-lab/tests/smoke_browser.py build/bin/solar-race
       - name: Test the installed C++ package and CLI
         run: |
           prefix="$PWD/build/install"

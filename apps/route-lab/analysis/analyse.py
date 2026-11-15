@@ -8,6 +8,7 @@ from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional, TextIO
 
 
 POLICIES = ("steady", "push", "reserve-first")
@@ -18,6 +19,7 @@ class Trial:
     completed: bool
     reserve_breached: bool
     drive_hours: float
+    distance_km: Optional[float] = None
 
 
 def bit(value: str) -> bool:
@@ -27,25 +29,33 @@ def bit(value: str) -> bool:
 
 
 def read_trials(path: Path) -> dict[int, dict[str, Trial]]:
-    by_trial: dict[int, dict[str, Trial]] = {}
     with path.open(newline="", encoding="utf-8") as file:
-        rows = csv.DictReader(file)
-        required = {"trial", "policy", "completed", "reserve_breached", "drive_hours"}
-        if not required.issubset(rows.fieldnames or []):
-            raise ValueError("input is missing trial result columns")
-        for row in rows:
-            try:
-                number = int(row["trial"])
-                policy = row["policy"]
-                hours = float(row["drive_hours"])
-                if number <= 0 or policy not in POLICIES or not math.isfinite(hours) or hours < 0:
-                    raise ValueError("invalid trial, policy or driving time")
-                group = by_trial.setdefault(number, {})
-                if policy in group:
-                    raise ValueError(f"duplicate policy {policy} in trial {number}")
-                group[policy] = Trial(bit(row["completed"]), bit(row["reserve_breached"]), hours)
-            except (TypeError, ValueError) as error:
-                raise ValueError(f"{path}:{rows.line_num}: {error}") from error
+        return read_trial_stream(file, str(path))
+
+
+def read_trial_stream(file: TextIO, source: str) -> dict[int, dict[str, Trial]]:
+    by_trial: dict[int, dict[str, Trial]] = {}
+    rows = csv.DictReader(file)
+    columns = rows.fieldnames or []
+    required = {"trial", "policy", "completed", "reserve_breached", "drive_hours"}
+    if not required.issubset(columns):
+        raise ValueError("input is missing trial result columns")
+    for row in rows:
+        try:
+            number = int(row["trial"])
+            policy = row["policy"]
+            hours = float(row["drive_hours"])
+            distance = float(row["distance_km"]) if "distance_km" in columns else None
+            if number <= 0 or policy not in POLICIES or not math.isfinite(hours) or hours < 0:
+                raise ValueError("invalid trial, policy or driving time")
+            if distance is not None and (not math.isfinite(distance) or distance < 0):
+                raise ValueError("invalid distance")
+            group = by_trial.setdefault(number, {})
+            if policy in group:
+                raise ValueError(f"duplicate policy {policy} in trial {number}")
+            group[policy] = Trial(bit(row["completed"]), bit(row["reserve_breached"]), hours, distance)
+        except (TypeError, ValueError) as error:
+            raise ValueError(f"{source}:{rows.line_num}: {error}") from error
     if not by_trial:
         raise ValueError("input contains no trials")
     for number, group in by_trial.items():

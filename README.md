@@ -11,7 +11,7 @@ pacing and battery outcomes under the same simulated weather.
 | Drive cycle | Integrate explicit speed ramps and regenerative power limits |
 | Mapped cycle | Interpolate motoring efficiency using wheel speed and torque |
 
-## Run the route lab
+## Play the route lab
 
 From the repository root, use CMake 3.20 or later and a C++20 compiler.
 Python 3.9 or later runs the analysis scripts.
@@ -20,16 +20,17 @@ Python 3.9 or later runs the analysis scripts.
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DECM_BUILD_PYTHON=OFF
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
-
-python3 apps/route-lab/analysis/run_matrix.py build/bin/solar-race \
-  --route data/routes/rolling-1150.csv --seed 2025 --out runs/rolling-2025
+python3 apps/route-lab/serve.py build/bin/solar-race
 ```
 
-The lab writes raw trial CSVs, paired comparisons, and a manifest. Run
-`build/bin/solar-race --help` for a single scenario or to use your own route.
+Open `http://127.0.0.1:8765` to change the vehicle, route, battery and model,
+then replay one weather draw and inspect the C++ leg logs. The browser shows
+finish rates, reserve risk and how far each pacing policy gets. A static
+homepage version replays a recorded run. [Lab guide and homepage integration](apps/route-lab/README.md)
+
 The checked-in routes are synthetic. The SR7 preset uses published figures
 where available, and SR8 models a provisional battery-and-solar scenario.
-[Lab guide](apps/route-lab/README.md) · [SR7 and SR8 inputs and results](apps/route-lab/docs/sunswift-profiles.md)
+[SR7 and SR8 inputs and results](apps/route-lab/docs/sunswift-profiles.md)
 
 ## Use the library
 

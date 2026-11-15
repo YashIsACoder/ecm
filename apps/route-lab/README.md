@@ -17,7 +17,32 @@ native CMake build and links directly against the C++ library.
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DECM_BUILD_PYTHON=OFF
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
+python3 apps/route-lab/serve.py build/bin/solar-race
+```
 
+Open `http://127.0.0.1:8765`. Run an experiment, then play or scrub the
+selected draw. Each strategy uses the same weather in that draw. The track
+and log show the distance reached, the chosen pace, state of charge and how
+much solar energy was collected. Download either the trial CSV or the leg trace.
+
+## Use the demo on a homepage
+
+Copy the contents of [`web/`](web/) into a static site directory and link to
+that directory with `?replay=1`. The page loads a recorded native SR7 experiment
+with interactive playback. New experiments are available through the local lab.
+To regenerate the recorded data after rebuilding, run
+
+```sh
+python3 apps/route-lab/serve.py build/bin/solar-race \
+  --export-demo apps/route-lab/web/demo.json
+```
+
+The lab's dark-green palette takes its cue from the team's public presentation
+of Sunswift 8. [Sunswift Racing](https://www.sunswift.com/)
+
+## Batch experiments
+
+```sh
 python3 apps/route-lab/analysis/run_matrix.py build/bin/solar-race \
   --route data/routes/rolling-1150.csv --trials 2000 --seed 2025 \
   --out runs/rolling-2025
@@ -35,6 +60,9 @@ build/bin/solar-race --vehicle sr7 --model mapped \
   --route data/routes/outback-2025-style.csv --trials 2000 --seed 2025 > runs/sr7.csv
 python3 apps/route-lab/analysis/analyse.py runs/sr7.csv
 ```
+
+Add `--trace-trial 6` to write one draw's leg log to stderr while the regular
+CSV stays on stdout. Redirect stderr to a trace file when working from a shell.
 
 The binary embeds the default outback fixture, so it runs from any working
 directory without a `--route` argument. Supply `--route PATH` for your own
