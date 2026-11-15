@@ -86,7 +86,7 @@ ctest --test-dir build --output-on-failure
 cmake --install build --prefix "$PWD/build/install"
 ```
 
-Link `ECM::ecm` for the discrete and road-segment APIs or `ECM::ecm_cont` for the continuous model. Both targets are available with `add_subdirectory` and via `find_package(ECM 0.1 CONFIG REQUIRED)` using the install prefix in `CMAKE_PREFIX_PATH`.
+Link `ECM::ecm` for the discrete and road-segment APIs or `ECM::ecm_cont` for the continuous and route models. Both targets are available with `add_subdirectory` and via `find_package(ECM 0.2 CONFIG REQUIRED)` using the install prefix in `CMAKE_PREFIX_PATH`.
 
 ### Discrete stint
 
@@ -147,6 +147,14 @@ const double net_draw_wh = energy.net_dc_wh();
 ```
 
 The Python extension exposes the same C++ implementation as `ecm.drive_cycle`. The [validation example](examples/validate_drive_cycle.py) compares its output with an exact solution and fixed-step midpoint integration.
+
+### Route model adapters
+
+`ecm_cont/route_energy.hpp` exposes three route estimators that take the same
+road, wind and irradiance inputs and return duration, signed DC demand and
+solar generation. Choose segment, continuous speed cycle or a cycle with an
+interpolated motoring-efficiency map. See [the route adapter contract](docs/route-models.md)
+for a comparison and an example of substituting models.
 
 ---
 

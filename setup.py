@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name="ecm",
-    version="0.1.0",
+    version="0.2.0",
     description="Energy Consumption Model (ECM) with Python bindings",
     python_requires=">=3.8",
     ext_modules=[
@@ -21,6 +21,7 @@ setup(
                 "src/ecm_cont/dynamics.cpp",
                 "src/ecm_cont/ecm_continuous.cpp",
                 "src/ecm_cont/drive_cycle.cpp",
+                "src/ecm_cont/route_energy.cpp",
             ],
             include_dirs=["include"],
             cxx_std=20,

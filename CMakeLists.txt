@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 
 project(
     ECM
-    VERSION 0.1.0
+    VERSION 0.2.0
     LANGUAGES CXX
 )
 
@@ -49,6 +49,7 @@ add_library(ecm_cont STATIC
     src/ecm_cont/dynamics.cpp
     src/ecm_cont/ecm_continuous.cpp
     src/ecm_cont/drive_cycle.cpp
+    src/ecm_cont/route_energy.cpp
 )
 add_library(ECM::ecm_cont ALIAS ecm_cont)
 
@@ -129,6 +130,10 @@ if(ECM_BUILD_TESTS)
     target_link_libraries(ecm_drive_cycle_test PRIVATE ecm_cont)
     add_test(NAME ECM.DriveCycle COMMAND ecm_drive_cycle_test)
 
+    add_executable(ecm_route_energy_test tests/test_route_energy.cpp)
+    target_link_libraries(ecm_route_energy_test PRIVATE ecm_cont)
+    add_test(NAME ECM.RouteEnergy COMMAND ecm_route_energy_test)
+
     if(ECM_BUILD_PYTHON)
         foreach(test_name IN ITEMS test_ecm test_cont test_drive_cycle)
             add_test(NAME ECM.Python.${test_name}
@@ -143,7 +148,7 @@ endif()
 # =========================
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/ECMConfigVersion.cmake"
-    COMPATIBILITY SameMinorVersion)
+    COMPATIBILITY SameMajorVersion)
 
 install(TARGETS ecm ecm_cont
     EXPORT ECMTargets
