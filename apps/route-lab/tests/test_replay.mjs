@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { defaultSettings, readSetupFile, settingsFromQuery, setupQuery } from "../web/scenario.mjs";
-import { playbackTimeline, raceClock, replaySpeed, skyCondition, traceAt, translateTime } from "../web/replay.mjs";
+import { checkpointHour, routeBook, playbackTimeline, raceClock, replaySpeed, skyCondition, traceAt, translateTime } from "../web/replay.mjs";
 
-const { result: { trace: { logs } } } = JSON.parse(readFileSync(new URL("../web/demo.json", import.meta.url)));
+const { result: { trace: { logs, points } } } = JSON.parse(readFileSync(new URL("../web/demo.json", import.meta.url)));
 const steady = logs.steady;
 const control = steady.find(({ control_hours }) => control_hours > 0);
+const stops = routeBook(points, "Darwin");
+assert.equal(stops[0].km, 0);
+assert.equal(stops.at(-1).name, "Adelaide");
+assert.equal(checkpointHour(steady, stops[1].leg), control.race_arrive_hours);
+assert.equal(checkpointHour([{ depleted: 1 }], 0), undefined);
 const during = traceAt(steady, control.race_arrive_hours + control.control_hours / 2);
 assert.equal(during.phase, "control");
 assert.equal(replaySpeed(during), 0);

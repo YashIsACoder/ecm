@@ -4,7 +4,7 @@ export const defaultSettings = Object.freeze({
   steady_kmh: 82, push_kmh: 92, reserve_strategy: "tiers",
   reserve_fast_kmh: 92, reserve_medium_kmh: 85, reserve_slow_kmh: 75, reserve_target_pct: 35,
   array_m2: null, cell_efficiency_pct: null, system_efficiency_pct: null, parked_wh_m2: null,
-  solar_multiplier: 1, headwind_offset_mps: 0, rain_multiplier: 0.65,
+  solar_multiplier: 1, headwind_offset_mps: 0, rain_multiplier: 1, gust_sd_mps: 2,
 });
 
 export function settingsFromQuery(query) {

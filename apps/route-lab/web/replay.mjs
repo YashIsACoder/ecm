@@ -172,6 +172,20 @@ function mapProjection(geographic, width, height) {
   ];
 }
 
+export function routeBook(points, start) {
+  return [
+    { name: start, km: 0, leg: -1 },
+    ...points.slice(0, -1).flatMap((point, leg) => point.control_minutes > 0 ? [{ ...point, leg }] : []),
+    { ...points.at(-1), leg: points.length - 1 },
+  ];
+}
+
+export function checkpointHour(events, leg) {
+  if (leg === -1) return 0;
+  const event = events[leg];
+  return event && !event.depleted ? event.race_arrive_hours : undefined;
+}
+
 export function skyCondition(event) {
   const rain = event.rain_mm_h ?? 0;
   if (rain >= 2) return "Rain";
@@ -214,15 +228,20 @@ function drawWeather(ctx, centre, weather, night, hour) {
   ctx.restore();
 }
 
-export function drawRouteMap(canvas, trace, positions, selected, night, hour = 0) {
+export function drawRouteMap(canvas, trace, positions, selected, night, hour = 0, camera = "overview") {
   const frame = prepare(canvas);
   if (!frame) return;
   const { ctx, width, height, color } = frame;
   const route = routes[trace.route];
-  const project = mapProjection(route.geographic, width, height);
-  const points = route.points.map(project);
+  const overview = mapProjection(route.geographic, width, height);
   const kilometres = [0, ...trace.points.map((point) => point.km)];
   const active = positions[selected];
+  const [focusX, focusY] = positionAt(route.points.map(overview), kilometres, active.distance);
+  const project = camera === "follow" ? (point) => {
+    const [x, y] = overview(point);
+    return [width / 2 + (x - focusX) * 2.7, height / 2 + (y - focusY) * 2.7];
+  } : overview;
+  const points = route.points.map(project);
   const weather = active.event;
   const rainy = (active.phase === "drive" || active.phase === "control") && weather.rain_mm_h > 0;
   const sun = Math.max(0, Math.min(1, weather.irradiance_w_m2 / 1000));
@@ -262,8 +281,15 @@ export function drawRouteMap(canvas, trace, positions, selected, night, hour = 0
   ctx.strokeStyle = "#0c1913";
   ctx.lineWidth = 7;
   ctx.stroke();
-  ctx.strokeStyle = "#b7d576";
+  ctx.strokeStyle = "#b7d576a5";
   ctx.lineWidth = 2;
+  ctx.stroke();
+
+  const traveled = points.filter((point, index) => kilometres[index] < active.distance);
+  traveled.push(positionAt(points, kilometres, active.distance));
+  polyline(ctx, traveled);
+  ctx.strokeStyle = color(policyStyles[selected].color);
+  ctx.lineWidth = 3;
   ctx.stroke();
   for (const [index, [x, y]] of points.entries()) {
     const control = trace.points[index - 1]?.control_minutes > 0;
@@ -274,7 +300,9 @@ export function drawRouteMap(canvas, trace, positions, selected, night, hour = 0
   }
   ctx.font = "600 11px system-ui, sans-serif";
   ctx.textBaseline = "middle";
-  const labels = width < 420 && route.geographic ? [0, 12, 17, 28] : route.labels;
+  const labels = camera === "follow"
+    ? [...new Set([...route.labels, active.event.leg + 1])].sort((a, b) => a - b)
+    : width < 420 && route.geographic ? [0, 12, 17, 28] : route.labels;
   for (const [index, point] of labels.entries()) {
     const [x, y] = points[point];
     const label = point === 0 ? route.start : trace.points[point - 1].name;
@@ -299,7 +327,7 @@ export function drawRouteMap(canvas, trace, positions, selected, night, hour = 0
   ctx.textAlign = "center";
   for (const [index, marker] of markers.entries()) {
     const { x, y, paint, state } = marker;
-    if (!["control", "overnight"].includes(state.phase)) continue;
+    if (!["control", "overnight"].includes(state.phase) || x < 0 || x > width || y < 0 || y > height) continue;
     const label = state.phase === "control" ? "REST" : "PARKED";
     const tagX = Math.max(29, Math.min(width - 29, x + (index - 1) * 30));
     const tagY = Math.max(10, y - 24 - (index % 2) * 15);

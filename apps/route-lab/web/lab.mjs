@@ -1,7 +1,7 @@
 "use strict";
 
 import { routes } from "./map-data.mjs";
-import { drawRouteMap, playbackTimeline, raceClock, replaySpeed, skyCondition, traceAt, translateTime } from "./replay.mjs";
+import { checkpointHour, drawRouteMap, playbackTimeline, raceClock, replaySpeed, routeBook, skyCondition, traceAt, translateTime } from "./replay.mjs";
 
 import { mountSetup } from "./configure.mjs";
 import { settingsFromQuery, setupQuery } from "./scenario.mjs";
@@ -36,7 +36,12 @@ const drawLabel = document.querySelector("#draw-label");
 const readouts = document.querySelector("#policy-readouts");
 const map = document.querySelector("#route-map");
 const mapHeading = document.querySelector("#route-map-heading");
-const mapKind = document.querySelector("#map-kind");
+const controlStops = document.querySelector("#control-stops");
+const cameraButtons = [...document.querySelectorAll("[data-camera]")];
+const mapProgress = document.querySelector("#map-progress");
+const chargeMeter = document.querySelector("#selected-charge");
+const chargeLabel = document.querySelector("#selected-charge-label");
+const rainChance = document.querySelector("#race-rain-chance");
 const mapCaption = document.querySelector("#map-caption");
 const energyPlace = document.querySelector("#energy-place");
 const energyBreakdown = document.querySelector("#energy-breakdown");
@@ -48,6 +53,8 @@ let timer;
 let historyKey;
 let timeline;
 let scenario;
+let camera = "overview";
+let stops;
 const phaseLabels = { drive: "On course", control: "REST", overnight: "Parked", finish: "Finished", depleted: "Depleted" };
 
 function resetReplay() {
@@ -57,7 +64,6 @@ function resetReplay() {
   const { draw, logs, route } = current.trace;
   const mapRoute = routes[route];
   mapHeading.textContent = mapRoute.title;
-  mapKind.textContent = mapRoute.geographic ? "CORRIDOR MAP" : "SCHEMATIC";
   mapCaption.textContent = mapRoute.geographic
     ? "Gold markers indicate control stops. Approximate route geometry. Coastline by Natural Earth."
     : "Gold markers indicate control stops on this fictional route.";
@@ -68,6 +74,20 @@ function resetReplay() {
   leg.disabled = Number(leg.max) === 0;
   play.disabled = leg.disabled;
   leg.value = 0;
+  stops = routeBook(current.trace.points, mapRoute.start).map(({ name, km, leg: stopLeg }) => {
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    const place = document.createElement("strong");
+    place.textContent = name;
+    const distance = document.createElement("small");
+    distance.textContent = `${numbers.format(km)} km`;
+    button.append(place, distance);
+    button.addEventListener("click", () => jumpTo(checkpointHour(current.trace.logs[logPolicy.value], stopLeg)));
+    item.append(button);
+    return { item, button, leg: stopLeg };
+  });
+  controlStops.replaceChildren(...stops.map(({ item }) => item));
   readouts.replaceChildren();
   for (const name of Object.keys(labels)) {
     const row = document.createElement("button");
@@ -113,7 +133,20 @@ function renderReplay() {
     const pace = state.phase === "drive" ? `${numbers.format(replaySpeed(state))} km/h` : phaseLabels[state.phase];
     row.lastElementChild.textContent = `${numbers.format(state.distance)} km · ${charge} · ${pace}`;
   }
-  drawRouteMap(map, current.trace, positions, selected, night, hour);
+  const remaining = current.distances_km.at(-1) - positions[selected].distance;
+  mapProgress.textContent = `${numbers.format(remaining)} km to finish`;
+  drawRouteMap(map, current.trace, positions, selected, night, hour, camera);
+  for (const { button, leg: stopLeg } of stops) {
+    const arrival = checkpointHour(current.trace.logs[selected], stopLeg);
+    button.disabled = arrival === undefined;
+    const state = positions[selected];
+    button.dataset.passed = String(arrival !== undefined && hour >= arrival);
+    if (state.event.leg === stopLeg && (state.phase === "control" || state.phase === "finish")) {
+      button.setAttribute("aria-current", "location");
+    } else {
+      button.removeAttribute("aria-current");
+    }
+  }
   const key = `${selected}-${positions[selected].reached}`;
   if (key === historyKey) return;
   historyKey = key;
@@ -145,6 +178,8 @@ function renderTelemetry(policy, state) {
   const duration = event.race_arrive_hours - event.race_depart_hours;
   speedDisplay.textContent = `${numbers.format(replaySpeed(state))} km/h`;
   paceDisplay.textContent = driving ? `${numbers.format(event.speed_kmh)} km/h` : "—";
+  chargeMeter.value = state.soc;
+  chargeLabel.textContent = `${state.soc.toFixed(1)}%`;
   powerDisplay.textContent = driving && duration > 0 ? `${numbers.format(event.solar_wh / duration)} W` : "—";
   planDisplay.hidden = !driving || event.planned_arrival_soc_pct == null;
   if (!planDisplay.hidden) {
@@ -163,6 +198,9 @@ function renderTelemetry(policy, state) {
   const rainRate = rain < .05 ? "<0.1" : rain.toFixed(1);
   rainDisplay.textContent = !weatherAvailable ? "—" : rain > 0 ? `${rainRate} mm/h` : "Dry";
   wetnessDisplay.textContent = weatherAvailable ? percent(wetness) : "—";
+  const rainProbability = event.rain_probability ?? 0;
+  const probabilityLabel = rainProbability > 0 && rainProbability < .001 ? "<0.1%" : percent(rainProbability);
+  rainChance.textContent = weatherAvailable ? probabilityLabel : "—";
   capDisplay.textContent = driving ? `${numbers.format(event.effective_pace_cap_kmh ?? event.speed_kmh)} km/h` : "—";
   const wind = event.headwind_mps;
   windDisplay.textContent = weatherAvailable
@@ -347,13 +385,19 @@ for (const control of [rate, clockMode]) {
     toggleReplay();
   });
 }
-nextRest.addEventListener("click", () => {
-  const hour = nextControlHour();
+function jumpTo(hour) {
   if (hour === undefined) return;
   pauseReplay();
   leg.value = hour;
   renderReplay();
-});
+}
+
+nextRest.addEventListener("click", () => jumpTo(nextControlHour()));
+cameraButtons.forEach((button) => button.addEventListener("click", () => {
+  camera = button.dataset.camera;
+  cameraButtons.forEach((mode) => mode.setAttribute("aria-pressed", String(mode === button)));
+  renderReplay();
+}));
 leg.addEventListener("input", () => {
   pauseReplay();
   renderReplay();

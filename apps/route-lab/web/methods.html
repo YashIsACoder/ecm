@@ -66,7 +66,7 @@
       </article>
       <article class="method-panel">
         <h2>Rain and road wetness</h2>
-        <p>A separate seeded rain front is more likely to produce showers when the sampled sunlight is low. Road wetness moves toward a rain-dependent equilibrium and decays after the shower.</p>
+        <p>Station averages set the August wet-day prior along the corridor. The model converts that prior to the time spent on each leg and draws spatially correlated showers. Road wetness builds during rain and persists as the road dries.</p>
         <code>W(x + d) = W_eq + [W(x) − W_eq] exp(−d / L)</code>
         <p>Rain reduces irradiance. A wet road raises rolling resistance and lowers the cruise cap, even after rain has passed.</p>
       </article>
@@ -76,12 +76,19 @@
         <p>On the current leg, the controller tests nine paces against that budget with the observed weather. It takes the fastest feasible candidate or falls back to the lowest simulated energy draw.</p>
       </article>
       <article class="method-panel">
+        <h2>Integrate gust loads</h2>
+        <p>The gust-aware ECM mode runs the mapped speed cycle at three wind values. Their weighted average captures the effect of wind variability on drag, motor efficiency and capped regeneration.</p>
+        <code>E[f(W)] ≈ f(μ − √3σ)/6 + 2f(μ)/3 + f(μ + √3σ)/6</code>
+      </article>
+      <article class="method-panel">
         <h2>Compare racing policies</h2>
         <p>Each draw feeds the same wind, solar and rolling conditions to three pacing policies. The chosen ECM variant computes aerodynamic drag, rolling loss, grade, kinetic energy, drivetrain losses, regeneration and auxiliary load.</p>
         <p>Finish and reserve rates use 95% Wilson intervals. Differences from Steady use paired Newcombe intervals. The intervals quantify Monte Carlo sampling error under the simulated conditions.</p>
       </article>
     </section>
     <footer class="method-sources">
+      <a href="https://www.bom.gov.au/climate/averages/tables/cw_014015.shtml">Bureau of Meteorology climate records</a>
+      <a href="https://dlmf.nist.gov/3.5#v">NIST Gauss quadrature</a>
       <a href="https://www.cambridge.org/engage/miir/article-details/662cb561418a5379b0db608a">Solar race strategy research</a>
       <a href="https://doi.org/10.1093/biomet/57.1.97">Hastings' sampling method</a>
       <a href="https://mc-stan.org/docs/2_40/reference-manual/analysis.html">Chain diagnostics</a>

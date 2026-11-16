@@ -47,7 +47,13 @@
               <option value="segment">Segment · fixed cruise</option>
               <option value="cycle">Drive cycle · speed ramps</option>
               <option value="mapped" selected>Mapped cycle · motor efficiency</option>
+              <option value="gust">Gust-aware cycle · variable wind</option>
             </select>
+            <div id="gust-options" hidden>
+              <label for="gust-sd">Gust spread (SD) <span>m/s</span></label>
+              <input id="gust-sd" name="gust_sd_mps" type="number" min="0" max="15" step="any" value="2" required>
+              <p class="field-note">Variation around the forecast headwind during a leg.</p>
+            </div>
             <label for="pack">Usable battery <span>kWh</span></label>
             <input id="pack" name="pack_kwh" type="number" min="0.001" step="any" placeholder="Preset · 38 kWh">
             <div class="field-pair">
@@ -129,9 +135,9 @@
                   <input id="wind-offset" name="headwind_offset_mps" type="number" min="-25" max="25" step="any" value="0" required>
                 </div>
               </div>
-              <label for="rain-multiplier">Rain intensity <span>×</span></label>
-              <input id="rain-multiplier" name="rain_multiplier" type="number" min="0" max="2" step="any" value=".65" required>
-              <p class="field-note">Blank hardware fields use the vehicle preset. Rain at 0× is dry. Positive wind offsets add headwind.</p>
+              <label for="rain-multiplier">Rain exposure <span>×</span></label>
+              <input id="rain-multiplier" name="rain_multiplier" type="number" min="0" max="8" step="any" value="1" required>
+              <p class="field-note">Blank hardware fields use the vehicle preset. Rain exposure uses the route prior at 1×. Use 0× for dry roads or 8× for a wet stress test. Positive wind offsets add headwind.</p>
           </fieldset>
         </div>
         <div class="setup-submit">

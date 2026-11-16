@@ -28,7 +28,9 @@ finish and reserve intervals, reach chart, battery history, and speed history.
 Choose 0.5×, 1×, 2× or 4× playback. **Race highlights** gives control holds more
 screen time and speeds through shared overnight parking. **Uniform time scale**
 plays the simulated clock at a constant rate. **Next REST** jumps to the
-selected strategy's next 30-minute control stop.
+selected strategy's next 30-minute control stop. **Follow car** keeps
+the selected strategy centred on the map. The route book jumps to recorded
+checkpoints for that car.
 
 Select a strategy to see mean leg speed, target speed, generated solar power,
 irradiance, wind, rain, wetness and wet-road pace cap. As a leg completes, the
@@ -52,7 +54,7 @@ See the [forecast model](docs/forecast.md) for MCMC and rain, and the
 Copy the contents of [`web/`](web/) into a static site directory and link to
 that directory with `?replay=1`. The page loads a recorded native SR7 experiment
 with interactive playback and a separate analytics page. The selected draw
-shows a rainy control stop, a finish and pack depletion. New experiments run through the local lab.
+shows the control-stop schedule, a finish and pack depletion. New experiments run through the local lab.
 To regenerate the recorded data after rebuilding, run
 
 ```sh
@@ -82,7 +84,7 @@ For one scenario, use the simulator directly.
 mkdir -p runs
 build/bin/solar-race --vehicle sr7 --model mapped \
   --route data/routes/outback-2025-style.csv --trials 2000 --seed 2025 \
-  --race-schedule --weather posterior --rain-multiplier 0.65 \
+  --race-schedule --weather posterior --rain-multiplier 1 \
   --reserve-strategy envelope --reserve-target-pct 15 --reserve-slow-kmh 65 > runs/sr7.csv
 python3 apps/route-lab/analysis/analyse.py runs/sr7.csv
 ```
@@ -91,7 +93,8 @@ Add `--trace-trial 15` to write one draw's leg log to stderr while the regular
 CSV stays on stdout. Redirect stderr to a trace file when working from a shell.
 `--race-schedule` adds control and overnight waits to a separate elapsed-time
 column. The default CLI uses baseline weather, dry roads and driving-time
-results. The browser defaults to posterior weather with rain intensity 0.65.
+results. The browser defaults to posterior weather with the observed August
+rain prior. Use **Rain exposure** to compare dry roads with a wetter scenario.
 
 The binary embeds the default outback fixture, so it runs from any working
 directory without a `--route` argument. Supply `--route PATH` for your own
@@ -104,6 +107,7 @@ directory without a `--route` argument. Supply `--route PATH` for your own
 | `segment` | Fixed cruising speed with a lumped kinetic-energy change |
 | `cycle` | Distance-preserving speed ramps with constant drivetrain efficiency |
 | `mapped` | The same speed cycle with bilinear motoring-efficiency interpolation |
+| `gust` | The mapped cycle averaged over three wind loads, with a configurable spread |
 
 Every backend returns duration, DC demand and solar generation.
 `Config::energy_model` also accepts a custom C++ estimator. See the

@@ -44,7 +44,7 @@ ASSETS = {
 MAX_TRIALS = 3000
 DEMO = {"route": "outback", "vehicle": "sr7", "model": "mapped", "trials": 500,
         "seed": "2025", "trace_trial": 15, "pack_kwh": None, "weather": "posterior",
-        "reserve_strategy": "envelope", "reserve_target_pct": 15, "reserve_slow_kmh": 65, "rain_multiplier": 0.65}
+        "reserve_strategy": "envelope", "reserve_target_pct": 15, "reserve_slow_kmh": 65, "rain_multiplier": 1}
 
 
 PACE_DEFAULTS = {"steady_kmh": 82, "push_kmh": 92, "reserve_fast_kmh": 92,
@@ -69,7 +69,7 @@ def experiment_arguments(request: dict) -> tuple[list[str], Path, int]:
     route, vehicle, model = (request.get(key) for key in ("route", "vehicle", "model"))
     if not isinstance(route, str) or route not in ROUTE_FILES:
         raise ValueError("Choose one of the supplied routes.")
-    if vehicle not in ("sr7", "sr8", "reference") or model not in ("segment", "cycle", "mapped"):
+    if vehicle not in ("sr7", "sr8", "reference") or model not in ("segment", "cycle", "mapped", "gust"):
         raise ValueError("Choose a supported vehicle and ECM model.")
     weather = request.get("weather", "posterior")
     if weather not in ("baseline", "posterior"):
@@ -106,7 +106,8 @@ def experiment_arguments(request: dict) -> tuple[list[str], Path, int]:
         "reserve_target_pct": bounded_number(request.get("reserve_target_pct", 35), "Charge target", 0, 100),
         "solar_multiplier": bounded_number(request.get("solar_multiplier", 1), "Solar multiplier", 0, 2),
         "headwind_offset_mps": bounded_number(request.get("headwind_offset_mps", 0), "Wind offset", -25, 25),
-        "rain_multiplier": bounded_number(request.get("rain_multiplier", 0), "Rain multiplier", 0, 2),
+        "gust_sd_mps": bounded_number(request.get("gust_sd_mps", 2), "Gust spread", 0, 15),
+        "rain_multiplier": bounded_number(request.get("rain_multiplier", 1), "Rain exposure", 0, 8),
     }
     for name, (label, minimum, maximum) in SOLAR_LIMITS.items():
         if request.get(name) is not None:

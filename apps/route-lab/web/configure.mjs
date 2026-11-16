@@ -2,7 +2,7 @@ import { readSetupFile, settingsFromQuery, setupQuery } from "./scenario.mjs";
 
 export function mountSetup(container, initial) {
   const form = container.querySelector("#experiment");
-  const { vehicle, reserve_strategy: strategy, trials, trace_trial: trace } = form.elements;
+  const { vehicle, model, reserve_strategy: strategy, trials, trace_trial: trace } = form.elements;
   const status = container.querySelector("#scenario-status");
   const fileInput = container.querySelector("#load-scenario");
   const presets = { reference: [5.5, 6, 24], sr7: [38, 4.8, 22], sr8: [45, 4.5, 23] };
@@ -13,8 +13,12 @@ export function mountSetup(container, initial) {
     if (preset) solarFields.forEach((name, i) => {
       form.elements.namedItem(name).placeholder = `Preset · ${preset[i]}`;
     });
+    const gust = model.value === "gust";
+    form.querySelector("#gust-options").hidden = !gust;
+    form.elements.gust_sd_mps.disabled = !gust;
     const envelope = strategy.value === "envelope";
     form.querySelector("#middle-tier").hidden = envelope;
+    form.elements.reserve_medium_kmh.disabled = envelope;
     form.querySelector("#strategy-note").textContent = envelope
       ? "Carries energy for upcoming legs and tests speeds using the current weather."
       : "Drops a speed tier when the current leg would cut into the charge target.";
@@ -36,6 +40,7 @@ export function mountSetup(container, initial) {
 
   applySettings(initial);
   vehicle.addEventListener("change", updateSetup);
+  model.addEventListener("change", updateSetup);
   strategy.addEventListener("change", updateSetup);
   trials.addEventListener("input", () => {
     trace.max = trials.value || String(3000);

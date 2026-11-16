@@ -35,9 +35,10 @@ def main() -> None:
                 demo = bundle["result"]
                 assert demo["trace"]["draw"] == 15 and demo["trace"]["route"] == "outback"
                 assert "race_arrive_hours" in demo["trace"]["logs"]["steady"][0]
-                events = demo["trace"]["logs"]["steady"]
-                assert any(event["control_hours"] == 0.5 for event in events)
-                assert any(event["rain_mm_h"] > 0 and event["road_wetness"] > 0 for event in events)
+                demo_events = demo["trace"]["logs"]["steady"]
+                assert any(event["control_hours"] == 0.5 for event in demo_events)
+                assert bundle["settings"]["rain_multiplier"] == 1
+                assert demo_events[0]["rain_mm_h"] == 0 and 0 < demo_events[0]["rain_probability"] < 0.001
             with urlopen(url + "/methods.html", timeout=5) as methods:
                 assert "Inside the sampler" in methods.read().decode()
             with urlopen(url + "/forecast-demo.json", timeout=5) as response:
@@ -48,7 +49,7 @@ def main() -> None:
                 assert asset.headers.get_content_type() == "text/javascript"
 
             request = {"route": "rolling", "vehicle": "sr8", "model": "mapped",
-                       "trials": 8, "seed": "42", "trace_trial": 3, "weather": "posterior"}
+                       "trials": 8, "seed": "42", "trace_trial": 3, "weather": "posterior", "rain_multiplier": 0}
             data = json.dumps(request).encode()
             with urlopen(Request(url + "/api/run", data, {"Content-Type": "application/json"}), timeout=10) as response:
                 result = json.load(response)
@@ -99,16 +100,23 @@ def main() -> None:
             assert regenerated.stdout == customized["csv"] and regenerated.stderr == customized["trace"]["csv"]
 
             wet_case = request | {"route": "outback", "vehicle": "sr7", "weather": "posterior",
-                                  "seed": "2025", "trials": 15, "trace_trial": 15, "rain_multiplier": 2}
+                                  "seed": "2025", "trials": 15, "trace_trial": 15, "rain_multiplier": 8}
             rainy = Request(url + "/api/run", json.dumps(wet_case).encode(), {"Content-Type": "application/json"})
             with urlopen(rainy, timeout=10) as response:
                 rainy_trace = json.load(response)["trace"]
             rainy_events = rainy_trace["logs"]["steady"]
-            assert any(event["rain_mm_h"] > 0 for event in rainy_events)
+            assert rainy_events[0]["rain_probability"] > demo_events[0]["rain_probability"] * 7
             for event in rainy_events:
                 checkpoint = rainy_trace["points"][event["leg"]]
                 assert event["effective_pace_cap_kmh"] <= checkpoint["pace_cap_kmh"]
                 assert event["speed_kmh"] <= event["effective_pace_cap_kmh"]
+
+            gust_case = request | {"model": "gust", "gust_sd_mps": 4}
+            gust = Request(url + "/api/run", json.dumps(gust_case).encode(), {"Content-Type": "application/json"})
+            with urlopen(gust, timeout=10) as response:
+                trace_with_gust = json.load(response)["trace"]["logs"]["steady"][0]
+            assert trace_with_gust["drag_wh"] > baseline_trace["drag_wh"]
+            assert trace_with_gust["race_arrive_hours"] == baseline_trace["race_arrive_hours"]
 
             request["trace_trial"] = 9
             rejected = Request(url + "/api/run", json.dumps(request).encode(), {"Content-Type": "application/json"})

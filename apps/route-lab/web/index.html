@@ -16,7 +16,7 @@
     <div class="intro">
       <div>
         <h1>Sunswift Route Lab</h1>
-        <p>Race the Stuart Highway with three pacing strategies under the same simulated weather.</p>
+        <p>Run three pacing strategies down the Stuart Highway and see where they gain time or run out of charge.</p>
       </div>
     </div>
     <details id="setup" class="inline-setup">
@@ -43,26 +43,19 @@
         <input id="leg" type="range" min="0" max="0" step="any" value="0">
         <output id="leg-label" for="leg"></output>
       </div>
-      <div class="replay-options">
-        <label for="replay-rate">Playback rate</label>
-        <select id="replay-rate">
-          <option value="0.5">0.5×</option><option value="1" selected>1×</option>
-          <option value="2">2×</option><option value="4">4×</option>
-        </select>
-        <label for="replay-clock-mode">Clock pacing</label>
-        <select id="replay-clock-mode">
-          <option value="highlights">Race highlights</option><option value="uniform">Uniform time scale</option>
-        </select>
-      </div>
       <div class="race-dashboard">
         <figure class="map-card">
           <div class="panel-heading">
             <h3 id="route-map-heading">Route map</h3>
-            <span id="map-kind"></span>
+            <div class="map-view" role="group" aria-label="Map camera">
+              <button type="button" data-camera="overview" aria-pressed="true">Overview</button>
+              <button type="button" data-camera="follow" aria-pressed="false">Follow car</button>
+            </div>
           </div>
           <div class="map-frame">
             <canvas id="route-map" role="img" aria-label="Animated Sunswift-style cars positioned along the simulated route. Each strategy’s distance and charge are shown alongside."></canvas>
             <div class="map-clock"><span id="race-day"></span><strong id="race-clock"></strong><span>Race clock</span></div>
+            <div id="map-progress" class="map-progress"></div>
             <div class="map-sky"><span class="sky-dot" aria-hidden="true"></span><span id="map-sky"></span></div>
           </div>
           <figcaption id="map-caption"></figcaption>
@@ -76,18 +69,41 @@
               <div><dt>Cruise target</dt><dd id="race-target"></dd></div>
               <div><dt>Solar output</dt><dd id="race-output"></dd></div>
             </dl>
+            <div class="charge-readout">
+              <label for="selected-charge">Battery charge</label>
+              <meter id="selected-charge" min="0" max="100" low="15" optimum="85" value="95"></meter>
+              <output id="selected-charge-label" for="selected-charge"></output>
+            </div>
             <p id="race-plan" hidden></p>
             <dl class="weather-strip">
               <div><dt>Irradiance</dt><dd id="race-solar"></dd></div>
-              <div><dt>Clear-sky fraction</dt><dd id="race-cloud"></dd></div>
+              <div><dt>Cloud transmission</dt><dd id="race-cloud"></dd></div>
               <div><dt>Wind</dt><dd id="race-wind"></dd></div>
               <div><dt>Rain</dt><dd id="race-rain"></dd></div>
               <div><dt>Road wetness</dt><dd id="race-wetness"></dd></div>
+              <div><dt>Rain chance</dt><dd id="race-rain-chance"></dd></div>
               <div><dt>Effective pace cap</dt><dd id="race-cap"></dd></div>
             </dl>
           </section>
           <div id="policy-readouts" class="policy-readouts" aria-label="Select a strategy to inspect"></div>
         </div>
+      </div>
+      <div class="playback-deck">
+        <div class="replay-options">
+          <label for="replay-rate">Playback rate</label>
+          <select id="replay-rate">
+            <option value="0.5">0.5×</option><option value="1" selected>1×</option>
+            <option value="2">2×</option><option value="4">4×</option>
+          </select>
+          <label for="replay-clock-mode">Clock pacing</label>
+          <select id="replay-clock-mode">
+            <option value="highlights">Race highlights</option><option value="uniform">Uniform time scale</option>
+          </select>
+        </div>
+        <nav class="route-book" aria-label="Jump to a control stop">
+          <h3>Route book</h3>
+          <ol id="control-stops"></ol>
+        </nav>
       </div>
       <section class="energy-card" aria-labelledby="energy-heading">
         <div class="panel-heading"><h3 id="energy-heading">Leg energy breakdown</h3><span id="energy-place"></span></div>
