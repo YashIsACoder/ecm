@@ -1,5 +1,7 @@
+#include "ecm/bwsc.hpp"
 #include "ecm/forecast.hpp"
 #include "ecm/lab.hpp"
+#include "ecm/lab_statistics.hpp"
 
 #include <algorithm>
 #include <array>
@@ -19,6 +21,22 @@ void near(double actual, double expected, const char* message) {
 }
 
 int main() {
+    near(bwsc_2025_stage_timing(2, 33.0).penalty_hours, 0.0, "on-time arrival has no delay");
+    near(bwsc_2025_stage_timing(2, 33.0 + 7.0 / 60.0).next_start_hours, 48.0 + 7.0 / 60.0,
+         "BWSC seven-minute example");
+    near(bwsc_2025_stage_timing(2, 33.0 + 13.0 / 60.0).next_start_hours, 48.0 + 16.0 / 60.0,
+         "BWSC thirteen-minute example");
+
+    const auto score = wilson95(2, 5);
+    near(score.low, .11762077423264795, "Wilson score lower bound");
+    near(score.high, .7692757187239869, "Wilson score upper bound");
+    PairedOutcomes pairs;
+    for (int i = 0; i < 70; ++i) pairs.add(i < 35, i < 20 || (i >= 35 && i < 40));
+    const auto difference = pairs.difference95();
+    near(difference.estimate, 1.0 / 7, "paired risk difference");
+    near(difference.low, .01814820884215798, "Newcombe lower bound");
+    near(difference.high, .2599511272762516, "Newcombe upper bound");
+
     const auto route = read_route(TEST_ROUTE);
     check(route.size() == 3 && route.back().day == 2 && route[1].destination == "Example, \"roadhouse\"",
           "CSV decodes quoted destinations and contiguous days");
@@ -207,6 +225,38 @@ int main() {
     near(substituted.finish_soc, 0.75, "a custom estimator feeds the battery update");
 
     std::mt19937_64 experiment_seed(42);
+    auto outlook = draw_weather(route, second);
+    auto envelope_config = defaults;
+    envelope_config.strategy.reserve_strategy = ReserveStrategy::energy_envelope;
+    envelope_config.strategy.envelope_speed_samples = 17;
+    const auto prepared = PreparedRace(route, envelope_config, outlook);
+    near(prepared.arrival_targets_wh().back(), envelope_config.capacity_wh * .35, "prepared terminal reserve");
+    const auto live_trace = prepared.simulate(weather, Policy::reserve_first);
+    const auto replayed_trace = prepared.simulate(weather, Policy::reserve_first);
+    near(live_trace.finish_soc, replayed_trace.finish_soc, "prepared forecast is reused across runs");
+    auto dark_outlook = outlook;
+    dark_outlook[1].solar_factor = 0;
+    const PreparedRace conservative(route, envelope_config, dark_outlook);
+    check(conservative.arrival_targets_wh()[0] > prepared.arrival_targets_wh()[0],
+          "planning forecast changes the prior checkpoint target");
+
+    auto late_route = route;
+    late_route[0].pace_cap_kmh = 40;
+    late_route[0].distance_km = 40 * (9 + 13.0 / 60.0);
+    late_route[1].distance_km = 1;
+    late_route[1].day = late_route[2].day;
+    auto timing_config = defaults;
+    timing_config.race_schedule = true;
+    timing_config.stage_timing = StageTiming::bwsc_2025;
+    timing_config.energy_model = [](const ecm_cont::RouteInput& input, const ecm::VehicleParams&,
+                                    const ecm::Drivetrain&, const ecm::SolarArray&) {
+        return ecm_cont::RouteEnergy{input.road.distance_m / input.road.cruise_speed_mps, 1, 0};
+    };
+    const auto late = simulate(late_route, weather, timing_config, Policy::steady, [](const LegObservation& leg) {
+        if (leg.leg == 1) near(leg.race_depart_hours, 24.0 + 16.0 / 60.0, "simulation carries the penalty forward");
+    });
+    near(late.stage_penalty_hours, 16.0 / 60.0, "run reports cumulative carried-over penalties");
+
     const auto first_draw = draw_weather(route, experiment_seed);
     std::size_t rows = 0;
     std::size_t traced_legs = 0;

@@ -51,12 +51,15 @@ struct StrategyConfig {
     double reserve_slow_kmh = 75.0;
     double reserve_target_soc = 0.35;  // Tier buffer or minimum envelope charge.
     ReserveStrategy reserve_strategy = ReserveStrategy::tiers;
+    std::size_t envelope_speed_samples = 9;  // Inclusive endpoints, 2–65 samples.
 };
 
 struct WeatherAdjustments {
     double solar_multiplier = 1.0;  // Multiplies driving and parked clear-sky fractions.
     double headwind_offset_mps = 0.0;
 };
+
+enum class StageTiming { fixed, bwsc_2025 };
 
 struct Config {
     ecm::VehicleParams vehicle{
@@ -72,6 +75,7 @@ struct Config {
     bool race_schedule = false;
     StrategyConfig strategy;
     WeatherAdjustments weather_adjustments;
+    StageTiming stage_timing = StageTiming::fixed;
 };
 
 [[nodiscard]] Config vehicle_config(std::string_view name);
@@ -93,6 +97,7 @@ struct Result {
     double solar_wh = 0.0;
     double spilled_wh = 0.0;
     double race_hours = 0.0;
+    double stage_penalty_hours = 0.0;  // Sum of carried-over next-start penalties.
 };
 
 enum class WeatherModel { baseline, posterior };
@@ -134,6 +139,7 @@ struct LegObservation {
     double mean_speed_kmh = 0.0;  // Distance over simulated driving time, including ramps.
     std::optional<double> planned_arrival_soc;  // Envelope target, possibly above capacity.
     double effective_pace_cap_kmh = 0.0;
+    double stage_penalty_hours = 0.0;  // Delay caused by this planned overnight arrival.
 };
 
 using LegSink = std::function<void(const LegObservation&)>;
@@ -141,6 +147,24 @@ using LegSink = std::function<void(const LegObservation&)>;
 struct TrialTrace {
     std::uint64_t trial = 0;  // One-based, required when a sink is supplied.
     std::function<void(Policy, const LegObservation&)> sink;
+};
+
+// Owns the itinerary and model and computes the envelope once for repeated simulations.
+class PreparedRace {
+public:
+    // Optional weather is the planning forecast, not the later observed draws.
+    // Supply one raw weather value per leg. An empty span uses the default planning scenario.
+    PreparedRace(std::vector<Leg> route, Config config, std::span<const Weather> planning_weather = {});
+
+    [[nodiscard]] std::span<const Leg> route() const noexcept { return route_; }
+    // Required arrival charge in Wh, one value per leg for the envelope policy.
+    [[nodiscard]] std::span<const double> arrival_targets_wh() const noexcept { return targets_; }
+    [[nodiscard]] Result simulate(std::span<const Weather> weather, Policy policy, const LegSink& trace = {}) const;
+
+private:
+    std::vector<Leg> route_;
+    Config config_;
+    std::vector<double> targets_;
 };
 
 [[nodiscard]] std::vector<Leg> default_route();
@@ -154,5 +178,7 @@ struct TrialTrace {
 // Exceptions from the model or sink stop the experiment and propagate.
 void run_experiment(std::span<const Leg> route, const Config& config,
                     Experiment experiment, const TrialSink& sink, const TrialTrace& trace = {});
+void run_experiment(const PreparedRace& race, Experiment experiment, const TrialSink& sink,
+                    const TrialTrace& trace = {});
 
 }  // namespace ecm::lab
