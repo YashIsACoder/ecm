@@ -51,13 +51,33 @@ residuals, independent calibration and forecast verification.
 
 ## Precipitation and road state
 
-An optional separate seeded stream generates a stationary AR(1) rain front
-with persistence 0.72. Lower sampled solar factors favour rain onset.
-For front state `z`, unadjusted solar fraction `s` and rain multiplier `m`,
-the simulated intensity in mm/h is
-`clamp(7.5 × m × (z + 2.2 × (0.75 − s) − 0.60), 0, 40)`.
-The multiplier spans 0 to 2. At 0 the existing dry sequence is unchanged.
-Solar and wind stress factors can be varied separately.
+Each outback leg has an August wet-day prior from a nearby Bureau of
+Meteorology station. The fixture stores the station's mean number of August
+days with at least 1 mm of rain divided by 31. These are climate averages.
+[Station inputs and mapping](../../../data/routes/README.md)
+
+An independent seeded stream evolves a stationary Gaussian front with
+correlation `exp(−d/180 km)` between adjacent leg midpoints. This is an
+assumed spatial correlation length. The Gaussian tail is uniform under
+the marginal prior. Compare that tail to the probability of rain during
+the leg's reference exposure:
+
+```text
+exposure_days = (leg_km / 80 km/h) / 24 h
+p_leg = 1 − (1 − p_wet_day)^(exposure_days × rain_exposure)
+```
+
+This conversion assumes a constant occurrence hazard within a day and a
+reference pace independent of strategy. A wet leg uses an illustrative
+lognormal rain rate, clipped to 0.25–20 mm/h. Rain rate and correlation
+are scenario assumptions. Rain exposure 1× applies the route prior, 0×
+is dry, and higher settings up to 8× increase the chance of a shower.
+A matched seed gives every policy the same conditions.
+
+In a 10,000-draw check on the bundled route with seed 2025, 0.38% of modeled
+legs were wet at 1× and 2.91% at 8×. At least one shower occurred in 8.94%
+and 50.52% of complete route draws respectively. These are simulation
+frequencies on one build. They quantify the effect of the scenario knob.
 
 Road wetness follows `dW/dx = (W_eq − W) / L` with
 `W_eq = rain / (4 + rain)`. Each leg applies the exact exponential update.
@@ -68,6 +88,6 @@ checkpoints and avoids treating driver pace as a weather input.
 A wet road multiplies rolling resistance by `1 + 0.14W` and reduces the pace
 cap by `1 − 0.14W`. Rain multiplies driving and parked irradiance by
 `1 − 0.35 × rain/(5 + rain)` after the scenario solar adjustment.
-The leg trace records rainfall, wetness and effective pace cap. All coefficients
-are synthetic scenario values. The browser's sky labels describe attenuation
+The leg trace records rain probability, rainfall, wetness and effective pace cap.
+The road and irradiance response coefficients are synthetic scenario values. The browser's sky labels describe attenuation
 and rain in the current simulated leg.

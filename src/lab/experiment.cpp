@@ -22,8 +22,8 @@ void run_experiment(std::span<const Leg> route, const Config& config,
         throw std::invalid_argument("traced trial must be between 1 and the number of trials");
     }
 
-    if (!(experiment.rain_multiplier >= 0.0 && experiment.rain_multiplier <= 2.0)) {
-        throw std::invalid_argument("rain multiplier must be from 0 to 2");
+    if (!(experiment.rain_multiplier >= 0.0 && experiment.rain_multiplier <= 8.0)) {
+        throw std::invalid_argument("rain exposure multiplier must be from 0 to 8");
     }
     const auto targets = detail::prepare_race(route, config);
     std::mt19937_64 random(experiment.seed);

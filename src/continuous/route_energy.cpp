@@ -109,4 +109,34 @@ RouteEnergy mapped_route_energy(const RouteInput& input, const ecm::VehicleParam
     return route_energy(drive_cycle_mapped(vehicle, profile, drivetrain, map, max_speed_step_mps, array));
 }
 
+RouteEnergy gust_route_energy(const RouteInput& input, const ecm::VehicleParams& vehicle,
+                             const ecm::Drivetrain& drivetrain, const ecm::SolarArray& array,
+                             const ecm::EfficiencyMap& map, double gust_sd_mps, RampRates rates,
+                             double max_speed_step_mps) {
+    if (!ecm::detail::nonnegative(gust_sd_mps)) {
+        throw std::invalid_argument("gust standard deviation must be nonnegative and finite");
+    }
+
+    auto profile = route_speed_profile(input, rates);
+    const auto evaluate = [&] {
+        return drive_cycle_mapped(vehicle, profile, drivetrain, map, max_speed_step_mps, array);
+    };
+    auto result = evaluate();
+    if (gust_sd_mps == 0.0) return route_energy(result);
+
+    // Three-point Gauss–Hermite rule scaled for a standard normal.
+    const double offset = std::sqrt(3.0) * gust_sd_mps;
+    for (auto& interval : profile) interval.headwind_mps = input.road.headwind_mps - offset;
+    const auto low = evaluate();
+    for (auto& interval : profile) interval.headwind_mps = input.road.headwind_mps + offset;
+    const auto high = evaluate();
+    const auto average = [](double lo, double mean, double hi) {
+        return lo / 6.0 + mean * (2.0 / 3.0) + hi / 6.0;
+    };
+    result.drag_wh = average(low.drag_wh, result.drag_wh, high.drag_wh);
+    result.traction_wh = average(low.traction_wh, result.traction_wh, high.traction_wh);
+    result.recovered_wh = average(low.recovered_wh, result.recovered_wh, high.recovered_wh);
+    return route_energy(result);
+}
+
 }  // namespace ecm_cont

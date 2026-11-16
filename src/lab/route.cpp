@@ -83,6 +83,7 @@ std::vector<Leg> read_route(std::istream& input, std::string_view source_name) {
         "day", "destination", "distance_km", "grade_pct", "clear_sky_w_m2", "pace_cap_kmh",
     };
     bool timed_stops = false;
+    bool rain_prior = false;
     try {
         std::getline(input, line);
         trim_cr(line);
@@ -92,6 +93,10 @@ std::vector<Leg> read_route(std::istream& input, std::string_view source_name) {
             header.remove_prefix(utf8_bom.size());
         }
         auto names = fields(header);
+        if (names.size() > columns.size() && names.back() == "rain_day_probability") {
+            rain_prior = true;
+            names.pop_back();
+        }
         if (names.size() == columns.size() + 1 && names.back() == "control_minutes") {
             timed_stops = true;
             names.pop_back();
@@ -113,7 +118,7 @@ std::vector<Leg> read_route(std::istream& input, std::string_view source_name) {
         }
         try {
             auto values = fields(line);
-            if (values.size() != columns.size() + timed_stops || values[1].empty()) {
+            if (values.size() != columns.size() + timed_stops + rain_prior || values[1].empty()) {
                 throw std::runtime_error("route row does not match the header or has an empty destination");
             }
             const double day = number(values[0]);
@@ -125,6 +130,10 @@ std::vector<Leg> read_route(std::istream& input, std::string_view source_name) {
             }
             Leg leg{static_cast<int>(day), std::move(values[1]), number(values[2]), number(values[3]),
                     number(values[4]), number(values[5]), timed_stops ? number(values[6]) : 0.0};
+            if (rain_prior) leg.rain_day_probability = number(values.back());
+            if (leg.rain_day_probability < 0.0 || leg.rain_day_probability > 1.0) {
+                throw std::runtime_error("wet-day probability must be from 0 to 1");
+            }
             if (leg.control_minutes < 0.0) {
                 throw std::runtime_error("control stop minutes must be nonnegative");
             }

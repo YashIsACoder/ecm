@@ -111,7 +111,7 @@ def main() -> None:
     parser.add_argument("--trials", type=int, default=2000)
     parser.add_argument("--seed", type=int, default=2025)
     parser.add_argument("--vehicles", nargs="+", choices=VEHICLES, default=("sr7", "sr8"))
-    parser.add_argument("--models", nargs="+", choices=MODELS, default=MODELS)
+    parser.add_argument("--models", nargs="+", choices=(*MODELS, "gust"), default=MODELS)
     parser.add_argument("--pack-kwh", type=float, help="apply the same capacity override to every vehicle")
     args = parser.parse_args()
     if not 0 < args.trials < 2**64 or not 0 <= args.seed < 2**64:

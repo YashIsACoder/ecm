@@ -144,19 +144,40 @@ std::vector<Weather> draw_forecast_weather(std::span<const Leg> route, const For
 
 void draw_rain(std::span<const Leg> route, std::span<Weather> weather, double multiplier,
                std::mt19937_64& random) {
-    if (route.size() != weather.size() || !(multiplier >= 0.0 && multiplier <= 2.0)) {
-        throw std::invalid_argument("rain needs matching legs and a multiplier from 0 to 2");
+    if (route.size() != weather.size() || !(multiplier >= 0.0 && multiplier <= 8.0)) {
+        throw std::invalid_argument("rain needs matching legs and an exposure multiplier from 0 to 8");
+    }
+    if (multiplier == 0.0) {
+        for (auto& leg : weather) leg.rain_mm_h = leg.rain_probability = leg.road_wetness = 0.0;
+        return;
     }
     std::normal_distribution<double> normal;
-    constexpr double persistence = .72;
-    const double innovation = std::sqrt(1.0 - persistence * persistence);
-    double front = multiplier > 0.0 ? normal(random) : 0.0;
+    double front = normal(random);
     double wetness = 0.0;
+    double previous_distance = 0.0;
     for (std::size_t i = 0; i < route.size(); ++i) {
+        const auto& leg = route[i];
+        if (!(leg.distance_km > 0.0 && std::isfinite(leg.distance_km)) ||
+            !(leg.rain_day_probability >= 0.0 && leg.rain_day_probability <= 1.0)) {
+            throw std::invalid_argument("rain needs positive route distances and a valid wet-day probability");
+        }
+        if (i > 0) {
+            const double separation = .5 * previous_distance + .5 * leg.distance_km;
+            const double decay = separation / 180.0;
+            front = std::exp(-decay) * front + std::sqrt(-std::expm1(-2.0 * decay)) * normal(random);
+        }
+        previous_distance = leg.distance_km;
+
+        // Convert the daily occurrence rate to an exposure window at a reference 80 km/h.
+        const double window_days = (leg.distance_km / 80.0 / 24.0) * multiplier;
+        const double probability = leg.rain_day_probability == 1.0 ? 1.0
+            : -std::expm1(window_days * std::log1p(-leg.rain_day_probability));
+        const double tail = .5 * std::erfc(front / std::sqrt(2.0));
+        const double intensity_noise = normal(random);  // Consume the same draws for every exposure.
+        const double rain = tail < probability
+            ? std::clamp(std::exp(.6 + .55 * intensity_noise), .25, 20.0) : 0.0;
         auto& leg_weather = weather[i];
-        if (multiplier > 0.0) front = persistence * front + innovation * normal(random);
-        const double moisture = front + 2.2 * (.75 - leg_weather.solar_factor) - .60;
-        const double rain = std::clamp(7.5 * multiplier * moisture, 0.0, 40.0);
+        leg_weather.rain_probability = probability;
         const double equilibrium = rain / (4.0 + rain);
         const double response_km = rain > 0.0 ? 35.0 : 115.0;
         const double previous = wetness;

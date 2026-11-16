@@ -33,6 +33,24 @@ int main() {
     const auto mapped = ecm_cont::mapped_route_energy(cruise, vehicle, drivetrain, array, map);
     near(mapped.net_wh(), cycle.net_wh(), "constant map agrees with fixed drive efficiency");
 
+    const auto no_gust = ecm_cont::gust_route_energy(cruise, vehicle, drivetrain, array, map, 0.0);
+    near(no_gust.net_wh(), mapped.net_wh(), "zero gust spread recovers the mapped cycle");
+    const double spread = 3.0;
+    const auto gust = ecm_cont::gust_route_energy(cruise, vehicle, drivetrain, array, map, spread);
+    const double extra_drag = .5 * vehicle.rho * vehicle.Cd * vehicle.A * spread * spread *
+        cruise.road.distance_m / 3600.0;
+    near(gust.components->drag_wh, mapped.components->drag_wh + extra_drag,
+         "quadrature recovers the closed-form variance increase in drag");
+    near(gust.demand_wh, mapped.demand_wh + extra_drag / .9, "constant motoring map preserves added wheel work");
+    near(gust.seconds, mapped.seconds, "gust integration preserves the speed profile");
+    near(gust.solar_wh, mapped.solar_wh, "gust integration preserves the solar exposure");
+
+    auto downhill = cruise;
+    downhill.road.grade = -.5;
+    const auto braking = ecm_cont::gust_route_energy(downhill, vehicle, drivetrain, array, map, spread);
+    near(braking.components->recovered_wh, drivetrain.max_regen_power_w * braking.seconds / 3600.0,
+         "regeneration applies its cap before averaging over gusts");
+
     const ecm_cont::RouteInput short_leg{{100, 20, 0, 0, 0, 0}, 0};
     const auto triangular = ecm_cont::route_speed_profile(short_leg, {1, 1});
     if (triangular.size() != 2) {

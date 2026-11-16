@@ -25,7 +25,7 @@ std::uint64_t unsigned_value(std::string_view value) {
 
 void help(std::ostream& output) {
     output << "Usage: solar-race [--route PATH] [--trials N] [--seed N] [--pack-kwh KWH]\n"
-        << "                  [--vehicle reference|sr7|sr8] [--model segment|cycle|mapped] [--trace-trial N]\n"
+        << "                  [--vehicle reference|sr7|sr8] [--model segment|cycle|mapped|gust] [--trace-trial N]\n"
         << "Writes one CSV row per trial and pacing policy to stdout.\n"
         << "--trace-trial writes that draw's leg-by-leg CSV to stderr.\n"
         << "--race-schedule models control holds and scheduled overnight stops.\n"
@@ -36,6 +36,7 @@ void help(std::ostream& output) {
         << "        --reserve-fast-kmh N --reserve-medium-kmh N --reserve-slow-kmh N --reserve-target-pct N\n"
         << "Solar:  --array-m2 N --cell-efficiency-pct N --system-efficiency-pct N --parked-wh-m2 N\n"
         << "Weather stress test: --solar-multiplier N --headwind-offset-mps N --rain-multiplier N\n"
+        << "--gust-sd-mps adjusts the longitudinal wind spread for the gust model (default 2).\n"
         << "--pack-kwh overrides the selected vehicle's usable capacity.\n";
 }
 
@@ -98,6 +99,7 @@ int main(int argc, char** argv) {
         std::string_view vehicle = "reference";
         std::string_view model = "segment";
         std::optional<double> capacity, array_area, cell_efficiency, system_efficiency, parked_exposure;
+        double gust_sd_mps = 2.0;
         ecm::lab::StrategyConfig strategy;
         ecm::lab::WeatherAdjustments weather_adjustments;
         std::optional<std::uint64_t> traced_trial;
@@ -134,6 +136,8 @@ int main(int argc, char** argv) {
                 vehicle = value;
             } else if (option == "--model") {
                 model = value;
+            } else if (option == "--gust-sd-mps") {
+                gust_sd_mps = number(value, option, 0, 15);
             } else if (option == "--trace-trial") {
                 traced_trial = unsigned_value(value);
             } else if (option == "--weather") {
@@ -169,7 +173,7 @@ int main(int argc, char** argv) {
             } else if (option == "--solar-multiplier") {
                 weather_adjustments.solar_multiplier = number(value, option, 0, 2);
             } else if (option == "--rain-multiplier") {
-                experiment.rain_multiplier = number(value, option, 0, 2);
+                experiment.rain_multiplier = number(value, option, 0, 8);
             } else if (option == "--headwind-offset-mps") {
                 weather_adjustments.headwind_offset_mps = number(value, option, -25, 25);
             } else {
@@ -188,7 +192,7 @@ int main(int argc, char** argv) {
         }
 
         auto config = ecm::lab::vehicle_config(vehicle);
-        config.energy_model = ecm::lab::route_energy_model(model);
+        config.energy_model = ecm::lab::route_energy_model(model, gust_sd_mps);
         config.capacity_wh = capacity.value_or(config.capacity_wh);
         config.race_schedule = race_schedule;
         config.strategy = strategy;
@@ -204,7 +208,7 @@ int main(int argc, char** argv) {
                          "solar_wh,demand_wh,parked_wh,depleted,elapsed_hours,depart_soc_pct,spilled_wh,"
                          "irradiance_w_m2,drag_wh,rolling_wh,climb_wh,kinetic_wh,traction_wh,auxiliary_wh,"
                          "recovered_wh,race_depart_hours,race_arrive_hours,control_hours,overnight_hours,"
-                         "mean_speed_kmh,planned_arrival_soc_pct,rain_mm_h,road_wetness,effective_pace_cap_kmh\n"
+                         "mean_speed_kmh,planned_arrival_soc_pct,rain_mm_h,road_wetness,effective_pace_cap_kmh,rain_probability\n"
                       << std::fixed << std::setprecision(6);
             trace = {*traced_trial, [](ecm::lab::Policy policy, const ecm::lab::LegObservation& leg) {
                 std::cerr << ecm::lab::policy_name(policy) << ',' << leg.leg << ',' << leg.distance_km << ','
@@ -224,7 +228,7 @@ int main(int argc, char** argv) {
                     << ',' << leg.overnight_hours << ',' << leg.mean_speed_kmh << ',';
                 if (leg.planned_arrival_soc) std::cerr << 100.0 * *leg.planned_arrival_soc;
                 std::cerr << ',' << leg.weather.rain_mm_h << ',' << leg.weather.road_wetness
-                    << ',' << leg.effective_pace_cap_kmh << '\n';
+                    << ',' << leg.effective_pace_cap_kmh << ',' << leg.weather.rain_probability << '\n';
             }};
         }
         std::cout << "trial,policy,completed,reserve_breached,distance_km,drive_hours,finish_soc_pct,min_soc_pct,"

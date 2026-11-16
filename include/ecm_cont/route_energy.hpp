@@ -40,4 +40,10 @@ struct RouteEnergy {
                                                const ecm::EfficiencyMap& map, RampRates rates = {},
                                                double max_speed_step_mps = 0.5);
 
+// Average the mapped cycle over a Gaussian longitudinal gust distribution.
+[[nodiscard]] RouteEnergy gust_route_energy(const RouteInput& input, const ecm::VehicleParams& vehicle,
+                                             const ecm::Drivetrain& drivetrain, const ecm::SolarArray& array,
+                                             const ecm::EfficiencyMap& map, double gust_sd_mps,
+                                             RampRates rates = {}, double max_speed_step_mps = 0.5);
+
 }  // namespace ecm_cont

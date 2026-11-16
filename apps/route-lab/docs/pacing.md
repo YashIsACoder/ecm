@@ -53,21 +53,21 @@ arm64 macOS machine with Apple Clang 17.
 
 | Rain multiplier | Strategy | Finishes | Below 15% | CLI wall time |
 | --- | --- | ---: | ---: | ---: |
-| 0 | Tiers | 153/500 | 497/500 | 0.081 s |
-| 0 | Envelope | 491/500 | 126/500 | 0.210 s |
-| 0.65 | Tiers | 136/500 | 495/500 | 0.081 s |
-| 0.65 | Envelope | 483/500 | 172/500 | 0.216 s |
+| 0 | Tiers | 153/500 | 497/500 | 0.114 s |
+| 0 | Envelope | 491/500 | 126/500 | 0.275 s |
+| 1 | Tiers | 153/500 | 497/500 | 0.106 s |
+| 1 | Envelope | 491/500 | 127/500 | 0.275 s |
 
-With rain enabled, the envelope increased finish rate by 69.4 percentage
-points. The 95% paired interval was 65.1 to 73.2 points. Among the 136 draws
-where both rules finished, the envelope added a median 0.82 driving hours.
-This scenario favours preserving charge at the cost of pace. The interval
-describes Monte Carlo sampling error for these synthetic inputs.
+With August rain enabled, the envelope increased finish rate by 67.6
+percentage points. The 95% paired interval was 63.2 to 71.5 points.
+Among the 153 draws where both rules finished, the envelope added a median
+0.64 driving hours. The interval describes Monte Carlo sampling error for
+these synthetic scenarios.
 
 Reproduce from the repository root with the Release binary:
 
 ```sh
-for rain in 0 0.65; do
+for rain in 0 1; do
   for rule in tiers envelope; do
     build/bin/solar-race --vehicle sr7 --model mapped --race-schedule \
       --route data/routes/outback-2025-style.csv --weather posterior \

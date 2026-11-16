@@ -139,22 +139,40 @@ int main() {
     }
 
     const auto long_route = default_route();
+    near(long_route.front().rain_day_probability, .0096774, "route reads the August wet-day prior");
+    auto shower_route = planning_route;
+    shower_route[0].rain_day_probability = 1.0;
+    shower_route[1].rain_day_probability = 0.0;
+    auto generated = calm;
+    auto generated_again = calm;
     std::mt19937_64 wet_rng(91), wet_repeat(91);
-    auto generated = draw_forecast_weather(long_route, forecast, weather_random);
-    auto generated_again = generated;
-    const double original_sun = generated.front().solar_factor;
-    draw_rain(long_route, generated, 1.0, wet_rng);
-    draw_rain(long_route, generated_again, 1.0, wet_repeat);
-    near(generated.front().solar_factor, original_sun, "rain preserves the underlying sampled forecast");
-    bool shower = false, drying = false;
-    for (std::size_t i = 0; i < generated.size(); ++i) {
-        const auto& conditions = generated[i];
-        near(conditions.rain_mm_h, generated_again[i].rain_mm_h, "rain is replayable with the same seed");
-        check(conditions.road_wetness >= 0.0 && conditions.road_wetness <= 1.0, "wetness stays bounded");
-        shower |= conditions.rain_mm_h > 0.0;
-        drying |= conditions.rain_mm_h == 0.0 && conditions.road_wetness > 0.0;
+    draw_rain(shower_route, generated, 1.0, wet_rng);
+    draw_rain(shower_route, generated_again, 1.0, wet_repeat);
+    near(generated.front().solar_factor, calm.front().solar_factor, "rain preserves the base forecast");
+    near(generated.front().rain_mm_h, generated_again.front().rain_mm_h, "rain is seeded");
+    check(generated[0].rain_mm_h > 0.0 && generated[1].rain_mm_h == 0.0 &&
+          generated[1].road_wetness > 0.0, "roads retain moisture after a shower");
+
+    std::mt19937_64 climate_rng(87), stress_rng(87);
+    std::vector<Weather> climate(long_route.size(), calm[0]);
+    auto stress_weather = climate;
+    int climate_legs = 0, stressed_legs = 0;
+    for (int draw = 0; draw < 2000; ++draw) {
+        draw_rain(long_route, climate, 1.0, climate_rng);
+        draw_rain(long_route, stress_weather, 8.0, stress_rng);
+        for (std::size_t i = 0; i < climate.size(); ++i) {
+            const auto& base = climate[i];
+            const auto& stress_leg = stress_weather[i];
+            check(base.road_wetness >= 0.0 && base.road_wetness <= 1.0, "wetness stays bounded");
+            check(base.rain_mm_h == 0.0 || stress_leg.rain_mm_h == base.rain_mm_h,
+                  "increased exposure only adds wet events for the same seed");
+            climate_legs += base.rain_mm_h > 0.0;
+            stressed_legs += stress_leg.rain_mm_h > 0.0;
+        }
     }
-    check(shower && drying, "roads retain moisture after a shower");
+    check(climate_legs > 0 && climate_legs < 2000 * long_route.size() / 50,
+          "August rain affects fewer than two percent of default legs");
+    check(stressed_legs > climate_legs * 3, "stress mode increases rain frequency");
 
     const std::array short_route{Leg{1, "Finish", 10.0, 0.0, 0.0, 40.0}};
     const std::array no_sun{Weather{0.0, 0.0, 1.0, 0.0}};

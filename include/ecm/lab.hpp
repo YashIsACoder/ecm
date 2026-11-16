@@ -25,6 +25,7 @@ struct Leg {
     double clear_sky_w_m2;
     double pace_cap_kmh;
     double control_minutes = 0.0;  // Stationary hold after arriving at this waypoint.
+    double rain_day_probability = .05;  // Climatological wet-day probability for the leg's region.
 };
 
 struct Weather {
@@ -34,6 +35,7 @@ struct Weather {
     double park_solar_factor;
     double rain_mm_h = 0.0;
     double road_wetness = 0.0;  // Dimensionless fraction, including residual wetness after rain.
+    double rain_probability = 0.0;  // Marginal chance of rain in this leg.
 };
 
 using RouteEnergyModel = std::function<ecm_cont::RouteEnergy(
@@ -74,6 +76,7 @@ struct Config {
 
 [[nodiscard]] Config vehicle_config(std::string_view name);
 [[nodiscard]] RouteEnergyModel route_energy_model(std::string_view name);
+[[nodiscard]] RouteEnergyModel route_energy_model(std::string_view name, double gust_sd_mps);
 
 enum class Policy { steady, push, reserve_first };
 inline constexpr std::array policies{Policy::steady, Policy::push, Policy::reserve_first};
@@ -98,7 +101,7 @@ struct Experiment {
     std::uint64_t trials = 2000;
     std::uint64_t seed = 2025;
     WeatherModel weather = WeatherModel::baseline;
-    double rain_multiplier = 0.0;  // Synthetic showers, from 0 (disabled) to 2.
+    double rain_multiplier = 0.0;  // Rain occurrence hazard multiplier, from 0 (disabled) to 8.
 };
 
 struct TrialResult {

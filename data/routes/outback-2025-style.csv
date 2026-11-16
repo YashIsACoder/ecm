@@ -1,29 +1,29 @@
-day,destination,distance_km,grade_pct,clear_sky_w_m2,pace_cap_kmh,control_minutes
-1,Darwin hinterland,72,0.03,550,82,0
-1,Adelaide River,51,0.10,690,100,0
-1,Pine Creek,88,0.16,835,100,0
-1,Katherine,90,-0.09,910,92,30
-1,Mataranka,108,0.05,865,100,0
-1,Larrimah,75,0.03,725,90,0
-2,Daly Waters,92,0.07,575,96,0
-2,Dunmarra,51,-0.03,730,92,30
-2,Elliott,103,0.04,850,100,0
-2,Renner Springs,93,0.03,910,100,0
-2,Threeways,132,0.09,860,100,0
-2,Tennant Creek,25,0.04,700,82,30
-3,Wauchope,113,0.08,630,100,0
-3,Barrow Creek,113,0.12,790,100,30
-3,Ti Tree,90,0.05,900,100,0
-3,Aileron,58,-0.10,900,100,0
-3,Alice Springs,133,0.17,790,92,30
-4,Stuarts Well,90,0.02,590,95,0
-4,Erldunda,110,-0.05,730,100,30
-4,Kulgera,76,0.09,850,100,0
-4,Marla,178,-0.14,910,100,0
-4,Cadney Park,85,0.06,860,96,0
-4,Coober Pedy,155,-0.06,700,95,30
-5,Glendambo,253,-0.09,730,100,30
-5,Pimba,114,0.09,895,100,0
-5,Port Augusta,174,-0.24,820,93,30
-6,Port Wakefield,190,0.01,735,95,0
-6,Adelaide,108,-0.02,885,80,0
+day,destination,distance_km,grade_pct,clear_sky_w_m2,pace_cap_kmh,control_minutes,rain_day_probability
+1,Darwin hinterland,72,0.03,550,82,0,0.0096774
+1,Adelaide River,51,0.10,690,100,0,0.0096774
+1,Pine Creek,88,0.16,835,100,0,0.0032258
+1,Katherine,90,-0.09,910,92,30,0.0032258
+1,Mataranka,108,0.05,865,100,0,0.0032258
+1,Larrimah,75,0.03,725,90,0,0.0032258
+2,Daly Waters,92,0.07,575,96,0,0.0032258
+2,Dunmarra,51,-0.03,730,92,30,0.0129032
+2,Elliott,103,0.04,850,100,0,0.0129032
+2,Renner Springs,93,0.03,910,100,0,0.0129032
+2,Threeways,132,0.09,860,100,0,0.0129032
+2,Tennant Creek,25,0.04,700,82,30,0.0129032
+3,Wauchope,113,0.08,630,100,0,0.0387097
+3,Barrow Creek,113,0.12,790,100,30,0.0387097
+3,Ti Tree,90,0.05,900,100,0,0.0387097
+3,Aileron,58,-0.10,900,100,0,0.0387097
+3,Alice Springs,133,0.17,790,92,30,0.0387097
+4,Stuarts Well,90,0.02,590,95,0,0.0387097
+4,Erldunda,110,-0.05,730,100,30,0.0387097
+4,Kulgera,76,0.09,850,100,0,0.0387097
+4,Marla,178,-0.14,910,100,0,0.0483871
+4,Cadney Park,85,0.06,860,96,0,0.0483871
+4,Coober Pedy,155,-0.06,700,95,30,0.0483871
+5,Glendambo,253,-0.09,730,100,30,0.0483871
+5,Pimba,114,0.09,895,100,0,0.1193548
+5,Port Augusta,174,-0.24,820,93,30,0.1193548
+6,Port Wakefield,190,0.01,735,95,0,0.2322581
+6,Adelaide,108,-0.02,885,80,0,0.3451613
