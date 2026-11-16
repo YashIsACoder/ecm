@@ -60,6 +60,7 @@ struct WeatherAdjustments {
 };
 
 enum class StageTiming { fixed, bwsc_2025 };
+enum class EnergyRules { scenario, bwsc_2025_cruiser };
 
 struct Config {
     ecm::VehicleParams vehicle{
@@ -76,6 +77,8 @@ struct Config {
     StrategyConfig strategy;
     WeatherAdjustments weather_adjustments;
     StageTiming stage_timing = StageTiming::fixed;
+    EnergyRules energy_rules = EnergyRules::scenario;
+    double overnight_charge_power_w = 1500.0;  // Battery-side delivery limit in Cruiser mode.
 };
 
 [[nodiscard]] Config vehicle_config(std::string_view name);
@@ -98,6 +101,7 @@ struct Result {
     double spilled_wh = 0.0;
     double race_hours = 0.0;
     double stage_penalty_hours = 0.0;  // Sum of carried-over next-start penalties.
+    double external_charge_wh = 0.0;  // Battery-side overnight top-ups.
 };
 
 enum class WeatherModel { baseline, posterior };
@@ -140,6 +144,7 @@ struct LegObservation {
     std::optional<double> planned_arrival_soc;  // Envelope target, possibly above capacity.
     double effective_pace_cap_kmh = 0.0;
     double stage_penalty_hours = 0.0;  // Delay caused by this planned overnight arrival.
+    double external_charge_wh = 0.0;  // Charge from the overnight preceding this leg.
 };
 
 using LegSink = std::function<void(const LegObservation&)>;

@@ -2,6 +2,8 @@
 
 namespace ecm::lab {
 
+inline constexpr double bwsc_2025_cruiser_max_wh = 55'000'000.0 / 3600.0;
+
 struct BwscStageTiming {
     double scheduled_finish_hours;
     double late_hours;

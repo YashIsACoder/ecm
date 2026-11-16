@@ -38,6 +38,7 @@ void help(std::ostream& output) {
         << "Solar:  --array-m2 N --cell-efficiency-pct N --system-efficiency-pct N --parked-wh-m2 N\n"
         << "Weather stress test: --solar-multiplier N --headwind-offset-mps N --rain-multiplier N\n"
         << "--gust-sd-mps adjusts the longitudinal wind spread for the gust model (default 2).\n"
+        << "--overnight-charge-w sets the Cruiser battery-side charging power (default 1500).\n"
         << "--pack-kwh overrides the selected vehicle's usable capacity.\n";
 }
 
@@ -100,6 +101,7 @@ int main(int argc, char** argv) {
         std::string_view vehicle = "reference";
         std::string_view model = "segment";
         std::optional<double> capacity, array_area, cell_efficiency, system_efficiency, parked_exposure;
+        std::optional<double> overnight_charge_power;
         double gust_sd_mps = 2.0;
         ecm::lab::StrategyConfig strategy;
         ecm::lab::WeatherAdjustments weather_adjustments;
@@ -139,6 +141,8 @@ int main(int argc, char** argv) {
                 vehicle = value;
             } else if (option == "--model") {
                 model = value;
+            } else if (option == "--overnight-charge-w") {
+                overnight_charge_power = number(value, option, 0, 250000);
             } else if (option == "--gust-sd-mps") {
                 gust_sd_mps = number(value, option, 0, 15);
             } else if (option == "--trace-trial") {
@@ -197,6 +201,7 @@ int main(int argc, char** argv) {
         auto config = ecm::lab::vehicle_config(vehicle);
         config.energy_model = ecm::lab::route_energy_model(model, gust_sd_mps);
         config.capacity_wh = capacity.value_or(config.capacity_wh);
+        config.overnight_charge_power_w = overnight_charge_power.value_or(config.overnight_charge_power_w);
         config.race_schedule = race_schedule;
         if (bwsc_timing) config.stage_timing = ecm::lab::StageTiming::bwsc_2025;
         config.strategy = strategy;
@@ -205,6 +210,7 @@ int main(int argc, char** argv) {
         config.array.cell_efficiency = cell_efficiency.value_or(config.array.cell_efficiency);
         config.array.system_efficiency = system_efficiency.value_or(config.array.system_efficiency);
         config.parked_clear_sky_wh_m2 = parked_exposure.value_or(config.parked_clear_sky_wh_m2);
+        const bool cruiser = config.energy_rules == ecm::lab::EnergyRules::bwsc_2025_cruiser;
         const auto route = route_path ? ecm::lab::read_route(*route_path) : ecm::lab::default_route();
         ecm::lab::TrialTrace trace;
         if (traced_trial) {
@@ -212,7 +218,7 @@ int main(int argc, char** argv) {
                          "solar_wh,demand_wh,parked_wh,depleted,elapsed_hours,depart_soc_pct,spilled_wh,"
                          "irradiance_w_m2,drag_wh,rolling_wh,climb_wh,kinetic_wh,traction_wh,auxiliary_wh,"
                          "recovered_wh,race_depart_hours,race_arrive_hours,control_hours,overnight_hours,"
-                         "mean_speed_kmh,planned_arrival_soc_pct,rain_mm_h,road_wetness,effective_pace_cap_kmh,rain_probability,stage_penalty_hours\n"
+                         "mean_speed_kmh,planned_arrival_soc_pct,rain_mm_h,road_wetness,effective_pace_cap_kmh,rain_probability,stage_penalty_hours,external_charge_wh\n"
                       << std::fixed << std::setprecision(6);
             trace = {*traced_trial, [](ecm::lab::Policy policy, const ecm::lab::LegObservation& leg) {
                 std::cerr << ecm::lab::policy_name(policy) << ',' << leg.leg << ',' << leg.distance_km << ','
@@ -233,14 +239,15 @@ int main(int argc, char** argv) {
                 if (leg.planned_arrival_soc) std::cerr << 100.0 * *leg.planned_arrival_soc;
                 std::cerr << ',' << leg.weather.rain_mm_h << ',' << leg.weather.road_wetness
                     << ',' << leg.effective_pace_cap_kmh << ',' << leg.weather.rain_probability
-                    << ',' << leg.stage_penalty_hours << '\n';
+                    << ',' << leg.stage_penalty_hours << ',' << leg.external_charge_wh << '\n';
             }};
         }
         std::cout << "trial,policy,completed,reserve_breached,distance_km,drive_hours,finish_soc_pct,min_soc_pct,"
                      "demand_kwh,solar_kwh,spilled_kwh"
                   << (race_schedule ? ",race_hours" : "")
-                  << (bwsc_timing ? ",stage_penalty_hours" : "") << '\n' << std::fixed << std::setprecision(6);
-        ecm::lab::run_experiment(route, config, experiment, [race_schedule, bwsc_timing](const ecm::lab::TrialResult& trial) {
+                  << (bwsc_timing ? ",stage_penalty_hours" : "")
+                  << (cruiser ? ",external_charge_kwh" : "") << '\n' << std::fixed << std::setprecision(6);
+        ecm::lab::run_experiment(route, config, experiment, [race_schedule, bwsc_timing, cruiser](const ecm::lab::TrialResult& trial) {
             const auto& result = trial.result;
             std::cout << trial.trial << ',' << ecm::lab::policy_name(trial.policy) << ',' << result.completed << ','
                 << result.reserve_breached << ',' << result.distance_km << ',' << result.drive_hours << ','
@@ -248,6 +255,7 @@ int main(int argc, char** argv) {
                 << ',' << result.solar_wh / 1000.0 << ',' << result.spilled_wh / 1000.0;
             if (race_schedule) std::cout << ',' << result.race_hours;
             if (bwsc_timing) std::cout << ',' << result.stage_penalty_hours;
+            if (cruiser) std::cout << ',' << result.external_charge_wh / 1000.0;
             std::cout << '\n';
         }, trace);
         if (!std::cout.flush()) {

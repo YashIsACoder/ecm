@@ -1,4 +1,5 @@
 #include "ecm/lab.hpp"
+#include "ecm/bwsc.hpp"
 
 #include <cmath>
 #include <stdexcept>
@@ -12,11 +13,14 @@ Config vehicle_config(std::string_view name) {
     }
     if (name == "sr7") {
         config.vehicle = {
-            .rho = 1.18, .Cd = 0.095, .A = 1.4, .m = 500.0, .g = 9.80665, .Crr = 0.005, .rw = 0.27, .X = 150.0,
+            .rho = 1.18, .Cd = 0.095, .A = 1.4, .m = 660.0, .g = 9.80665, .Crr = 0.005, .rw = 0.27, .X = 150.0,
         };
         config.drivetrain = {0.91, 0.60, 2500.0};
         config.array = {4.8, 0.22, 0.92};
-        config.capacity_wh = 38000.0;
+        // Published 500 kg vehicle plus the two 80 kg ballasted occupants.
+        config.capacity_wh = bwsc_2025_cruiser_max_wh;
+        config.start_soc = 1.0;
+        config.energy_rules = EnergyRules::bwsc_2025_cruiser;
         return config;
     }
     if (name == "sr8") {

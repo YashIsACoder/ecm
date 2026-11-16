@@ -128,6 +128,51 @@ int main() {
     });
     check(!wet_run.completed, "wet run uses the same depletion rules");
 
+    const auto sr7 = vehicle_config("sr7");
+    near(sr7.capacity_wh, bwsc_2025_cruiser_max_wh, "SR7 defaults to the Cruiser limit");
+    near(sr7.start_soc, 1.0, "Cruiser starts fully charged");
+    auto cruiser = schedule;
+    cruiser.energy_rules = EnergyRules::bwsc_2025_cruiser;
+    cruiser.capacity_wh = 100.0;
+    cruiser.parked_clear_sky_wh_m2 = 0.0;
+    cruiser.energy_model = [](const ecm_cont::RouteInput&, const ecm::VehicleParams&,
+                             const ecm::Drivetrain&, const ecm::SolarArray&) {
+        return ecm_cont::RouteEnergy{900, 25, 0};
+    };
+    const auto charged = simulate(staged, weather, cruiser, Policy::steady, [](const LegObservation& leg) {
+        if (leg.leg < 2) near(leg.external_charge_wh, 0.0, "no external charge during driving day");
+        else {
+            near(leg.external_charge_wh, 55.0, "overnight tops up the deficit");
+            near(leg.depart_soc, 1.0, "next day departs with a full battery");
+        }
+    });
+    near(charged.external_charge_wh, 55.0, "external charge is accounted separately");
+    near(charged.finish_soc * cruiser.capacity_wh, cruiser.start_soc * cruiser.capacity_wh +
+         charged.solar_wh + charged.external_charge_wh - charged.demand_wh - charged.spilled_wh,
+         "Cruiser energy balance includes the external top-up");
+    near(charged.min_soc, .45, "overnight refill preserves the previous day's minimum");
+    cruiser.overnight_charge_power_w = 1;
+    const auto limited = simulate(staged, weather, cruiser, Policy::steady, [](const LegObservation& leg) {
+        if (leg.leg == 2) {
+            const double night_hours = 24.0 - .5 - .5;
+            near(leg.external_charge_wh, night_hours, "charge is bounded by watts times hours available");
+            near(leg.depart_soc, (.45 + night_hours / 100), "insufficient power leaves the pack partially charged");
+        }
+    });
+    near(limited.external_charge_wh, 23.0, "limited overnight energy is accounted");
+    cruiser.start_soc = .2;
+    const auto stranded = simulate(staged, weather, cruiser, Policy::steady);
+    check(!stranded.completed && stranded.distance_km < staged[0].distance_km,
+          "depletion before camp terminates the trial");
+    near(stranded.external_charge_wh, 0, "stranded cars never reach an overnight top-up");
+    cruiser.capacity_wh = 38000;
+    try {
+        (void)simulate(staged, weather, cruiser, Policy::steady);
+        throw std::runtime_error("oversize Cruiser pack was accepted");
+    } catch (const std::invalid_argument&) {
+        // Expected.
+    }
+
     const auto residuals = synthetic_weather_residuals();
     const auto forecast = calibrate_forecast(residuals, 2025);
     const auto rerun = calibrate_forecast(residuals, 2025);
@@ -210,7 +255,7 @@ int main() {
     check(exactly_empty.completed, "arrival with exactly zero charge counts as completion");
     near(exactly_empty.distance_km, 10.0, "entire leg");
 
-    check(vehicle_config("sr7").vehicle.m == 500.0 && vehicle_config("sr8").capacity_wh == 45000.0,
+    check(vehicle_config("sr7").vehicle.m == 660.0 && vehicle_config("sr8").capacity_wh == 45000.0,
           "vehicle presets select distinct parameters");
     flat.start_soc = 1.0;
     flat.energy_model = route_energy_model("cycle");

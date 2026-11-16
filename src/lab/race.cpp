@@ -10,6 +10,8 @@
 namespace ecm::lab {
 namespace {
 
+constexpr double nominal_overnight_hours = 15.0;  // 17:00 to 08:00.
+
 struct PacedLeg {
     double speed_kmh;
     ecm_cont::RouteEnergy energy;
@@ -168,6 +170,20 @@ std::vector<double> detail::prepare_race(std::span<const Leg> route, const Confi
         !std::isfinite(config.parked_clear_sky_wh_m2) || config.parked_clear_sky_wh_m2 < 0.0) {
         throw std::invalid_argument("invalid route or storage configuration");
     }
+    switch (config.energy_rules) {
+    case EnergyRules::scenario:
+        break;
+    case EnergyRules::bwsc_2025_cruiser:
+        if (config.capacity_wh > bwsc_2025_cruiser_max_wh) {
+            throw std::invalid_argument("2025 Cruiser storage exceeds 55 MJ (about 15.28 kWh)");
+        }
+        if (!std::isfinite(config.overnight_charge_power_w) || config.overnight_charge_power_w < 0.0) {
+            throw std::invalid_argument("overnight charging power must be finite and nonnegative");
+        }
+        break;
+    default:
+        throw std::invalid_argument("unknown energy rules");
+    }
     const auto& strategy = config.strategy;
     const auto valid_speed = [](double speed) { return speed >= 20.0 && speed <= 140.0; };
     if (!valid_speed(strategy.steady_kmh) || !valid_speed(strategy.push_kmh) ||
@@ -211,13 +227,20 @@ std::vector<double> detail::prepare_race(std::span<const Leg> route, const Confi
     const double floor = config.capacity_wh * std::max(config.reserve_soc, strategy.reserve_target_soc);
     std::vector<double> arrival_targets(route.size());
     double required_departure = floor;
+    const double overnight_external_budget = config.energy_rules == EnergyRules::bwsc_2025_cruiser
+        ? config.overnight_charge_power_w * nominal_overnight_hours : 0.0;
     for (std::size_t index = route.size(); index-- > 0;) {
         const auto& leg = route[index];
         const bool final = index + 1 == route.size();
         const bool overnight = finishes_stage(route, index);
-        const double charge = overnight && required_departure <= config.capacity_wh
-            ? parked_generation(config, forecast_at(index + 1)) : 0.0;
-        arrival_targets[index] = std::max(floor, required_departure - charge);
+        if (overnight && overnight_external_budget >= config.capacity_wh) {
+            // A nominal night can fully replenish the pack, so begin a fresh daily budget.
+            arrival_targets[index] = floor;
+        } else {
+            const double charge = overnight && required_departure <= config.capacity_wh
+                ? parked_generation(config, forecast_at(index + 1)) + overnight_external_budget : 0.0;
+            arrival_targets[index] = std::max(floor, required_departure - charge);
+        }
         // Entry speed at an ordinary waypoint is approximated by the candidate cruise speed.
         const bool standing = index == 0 || finishes_stage(route, index - 1) ||
                               control_stop(route[index - 1], config, false);
@@ -262,6 +285,8 @@ Result detail::simulate_prepared(std::span<const Leg> route, std::span<const Wea
     double stored_wh = config.capacity_wh * config.start_soc;
     double min_wh = stored_wh;
     double entry_kmh = 0.0;
+    double previous_overnight_hours = 0.0;
+    const bool cruiser = config.energy_rules == EnergyRules::bwsc_2025_cruiser;
     const auto store = [&](double delta_wh) {
         const double next_wh = stored_wh + delta_wh;
         result.spilled_wh += std::max(0.0, next_wh - config.capacity_wh);
@@ -279,10 +304,17 @@ Result detail::simulate_prepared(std::span<const Leg> route, std::span<const Wea
         const bool stop_at_end = final_leg || overnight || hold;
         const double spilled_before = result.spilled_wh;
         double parked_wh = 0.0;
-        if (new_day) {
+        double external_wh = 0.0;
+        const double overnight_hours = config.race_schedule ? previous_overnight_hours : nominal_overnight_hours;
+        if (new_day && (!cruiser || overnight_hours > 0.0)) {
             parked_wh = parked_generation(config, conditions);
             result.solar_wh += parked_wh;
             store(parked_wh);
+            if (cruiser) {
+                external_wh = std::min(config.capacity_wh - stored_wh, config.overnight_charge_power_w * overnight_hours);
+                result.external_charge_wh += external_wh;
+                store(external_wh);
+            }
         }
         const double depart_wh = stored_wh;
         const double race_depart = result.race_hours;
@@ -311,6 +343,7 @@ Result detail::simulate_prepared(std::span<const Leg> route, std::span<const Wea
         }
         result.stage_penalty_hours += penalty;
         result.race_hours = race_after_control + off_duty;
+        previous_overnight_hours = off_duty;
         result.demand_wh += energy.demand_wh * portion;
         result.solar_wh += energy.solar_wh * portion;
         store(-energy.net_wh() * portion);
@@ -328,7 +361,7 @@ Result detail::simulate_prepared(std::span<const Leg> route, std::span<const Wea
                    leg.clear_sky_w_m2 * conditions.solar_factor, components,
                    race_depart, race_arrive, control, off_duty,
                    portion > 0.0 ? leg.distance_km / (energy.seconds / 3600.0) : 0.0,
-                   target ? std::optional{*target / config.capacity_wh} : std::nullopt, pace_cap, penalty});
+                   target ? std::optional{*target / config.capacity_wh} : std::nullopt, pace_cap, penalty, external_wh});
         }
         if (depleted) {
             result.completed = false;
