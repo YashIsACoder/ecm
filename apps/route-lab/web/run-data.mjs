@@ -3,7 +3,7 @@ import { defaultSettings, settingsFromQuery, setupQuery } from "./scenario.mjs";
 export const policyLabels = { steady: "Steady", push: "Push", "reserve-first": "Reserve-first" };
 export const numbers = new Intl.NumberFormat("en-AU", { maximumFractionDigits: 0 });
 export const percent = (value) => `${(100 * value).toFixed(1)}%`;
-const cacheKey = "ecm.route-lab.last-run.v1";
+const cacheKey = "ecm.route-lab.last-run.v2";
 
 export function runQuery(settings, recorded) {
   return recorded ? "?replay=1" : setupQuery(settings);
@@ -12,7 +12,7 @@ export function runQuery(settings, recorded) {
 export function runSummary(data, settings) {
   const strategy = settings.reserve_strategy === "envelope" ? "Energy envelope" : "Speed tiers";
   const weather = settings.weather === "posterior" ? "Posterior weather" : "Baseline weather";
-  return `${numbers.format(data.trials)} draws · seed ${settings.seed} · ${settings.vehicle.toUpperCase()} · ${settings.model} · ${weather} · ${strategy}`;
+  return `${numbers.format(data.trials)} draws · seed ${settings.seed} · ${data.energy_rules === "bwsc_2025_cruiser" ? "SR7 Cruiser" : settings.vehicle.toUpperCase()} · ${settings.model} · ${weather} · ${strategy}`;
 }
 
 export async function readRun({ reuse = false } = {}) {

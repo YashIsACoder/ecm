@@ -38,6 +38,14 @@ build/bin/solar-race --vehicle sr7 --model gust --gust-sd-mps 2 \
 python3 apps/route-lab/analysis/analyse.py trials.csv
 ```
 
+Both entry points use the SR7 Cruiser energy rules. The default pack is
+55 MJ, and the 1,500 W battery-side charger can fill the pack during a
+normal overnight stop. Pass `--overnight-charge-w` or set
+`Config::overnight_charge_power_w` to test a different supply. The trace
+records `external_charge_wh` on the next departure. The trial CSV reports
+`external_charge_kwh` separately from solar.
+[SR7 inputs and physics check](../apps/route-lab/docs/sunswift-profiles.md)
+
 The two entry points use their own example settings. The native example
 uses an explicit planning forecast and 17 speed samples. The CLI has
 nine samples and the library's default planning forecast.

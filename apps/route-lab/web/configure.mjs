@@ -5,10 +5,15 @@ export function mountSetup(container, initial) {
   const { vehicle, model, reserve_strategy: strategy, trials, trace_trial: trace } = form.elements;
   const status = container.querySelector("#scenario-status");
   const fileInput = container.querySelector("#load-scenario");
-  const presets = { reference: [5.5, 6, 24], sr7: [38, 4.8, 22], sr8: [45, 4.5, 23] };
+  const presets = { reference: [5.5, 6, 24], sr7: ["55 MJ · about 15.28", 4.8, 22], sr8: [45, 4.5, 23] };
   const solarFields = ["pack_kwh", "array_m2", "cell_efficiency_pct"];
 
   function updateSetup() {
+    const cruiser = vehicle.value === "sr7";
+    const pack = form.elements.pack_kwh;
+    if (cruiser) pack.max = String((55_000_000 / 3600) / 1000);
+    else pack.removeAttribute("max");
+    form.querySelector("#cruiser-rules").hidden = !cruiser;
     const preset = presets[vehicle.value];
     if (preset) solarFields.forEach((name, i) => {
       form.elements.namedItem(name).placeholder = `Preset · ${preset[i]}`;

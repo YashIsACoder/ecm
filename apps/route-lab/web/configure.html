@@ -38,7 +38,7 @@
             </select>
             <label for="vehicle">Vehicle</label>
             <select id="vehicle" name="vehicle" required>
-              <option value="sr7">Sunswift SR7</option>
+              <option value="sr7">Sunswift SR7 · 2025 Cruiser</option>
               <option value="sr8">SR8 battery + solar scenario</option>
               <option value="reference">Reference solar car</option>
             </select>
@@ -55,7 +55,8 @@
               <p class="field-note">Variation around the forecast headwind during a leg.</p>
             </div>
             <label for="pack">Usable battery <span>kWh</span></label>
-            <input id="pack" name="pack_kwh" type="number" min="0.001" step="any" placeholder="Preset · 38 kWh">
+            <input id="pack" name="pack_kwh" type="number" min="0.001" step="any" placeholder="Preset · 55 MJ (about 15.28 kWh)">
+            <p id="cruiser-rules" class="field-note">2025 Cruiser storage limit. Leave blank to use 55 MJ. The model tops up the pack after each completed driving day, limited by charging power and hours parked.</p>
             <div class="field-pair">
               <div>
                 <label for="trials">Trials</label>
@@ -67,7 +68,7 @@
               </div>
             </div>
             <label for="trace-trial">Replay draw</label>
-            <input id="trace-trial" name="trace_trial" type="number" required min="1" max="500" step="1" value="15">
+            <input id="trace-trial" name="trace_trial" type="number" required min="1" max="500" step="1" value="7">
           </fieldset>
           <fieldset class="setup-card">
             <legend>Strategy settings</legend>

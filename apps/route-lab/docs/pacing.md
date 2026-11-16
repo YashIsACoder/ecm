@@ -23,7 +23,10 @@ The backward pass uses the selected ECM backend and a default dry planning
 forecast with 70% of clear-sky irradiance, 3 m/s headwind, and a 65%
 parked-solar factor. A caller can prepare a plan with a forecast per leg
 and set the speed grid size through `StrategyConfig`. Weather adjustments
-apply to that planning forecast and the observed simulations.
+apply to that planning forecast and the observed simulations. If the
+Cruiser charger can refill the pack in a nominal 15-hour night, the envelope
+uses the reserve target at the end of each day. Otherwise it includes the
+limited charging budget in the backward pass.
 [Prepared race API](../../../docs/bwsc-simulation.md)
 A target can exceed usable capacity. The trace exposes that infeasibility.
 
@@ -47,32 +50,29 @@ confidence guarantees under real weather.
 
 ## Example comparison
 
-The native release executable ran 500 paired draws of the synthetic SR7
-Darwin–Adelaide scenario. Both policies used the same weather seeds, vehicle,
-motor map, 65–92 km/h bounds and 15% charge target. These figures compare the
-Reserve-first row across runs. Timings include CLI launch and all three
-policies. Each timing is the median of five runs after a warm-up on one
-arm64 macOS machine with Apple Clang 17.
+The native release executable ran 500 paired draws of the synthetic
+SR7 Cruiser scenario. Both runs used the same seed, motor map, 65–92 km/h
+bounds, 55 MJ pack and 15% charge target. The table shows the Reserve-first
+row when configured to use tiers or the envelope.
 
-| Rain multiplier | Strategy | Finishes | Below 15% | CLI wall time |
+| Rain exposure | Pacing rule | Finishes | Below 15% | Median external charge |
 | --- | --- | ---: | ---: | ---: |
-| 0 | Tiers | 153/500 | 497/500 | 0.114 s |
-| 0 | Envelope | 491/500 | 126/500 | 0.275 s |
-| 1 | Tiers | 153/500 | 497/500 | 0.106 s |
-| 1 | Envelope | 491/500 | 127/500 | 0.275 s |
+| 0 | Tiers | 442/500 | 313/500 | 48.59 kWh |
+| 0 | Envelope | 499/500 | 132/500 | 49.62 kWh |
+| 1 | Tiers | 441/500 | 313/500 | 48.52 kWh |
+| 1 | Envelope | 499/500 | 132/500 | 49.62 kWh |
 
-With August rain enabled, the envelope increased finish rate by 67.6
-percentage points. The 95% paired interval was 63.2 to 71.5 points.
-Among the 153 draws where both rules finished, the envelope added a median
-0.64 driving hours. The interval describes Monte Carlo sampling error for
-these synthetic scenarios.
+At the August prior, the finish-rate difference is 11.6 percentage points
+with a 95% paired interval of 8.9 to 14.7 points. The comparison uses
+synthetic weather and a fixed stage itinerary. Each external energy
+median includes unfinished trials.
 
 Reproduce from the repository root with the Release binary:
 
 ```sh
 for rain in 0 1; do
   for rule in tiers envelope; do
-    build/bin/solar-race --vehicle sr7 --model mapped --race-schedule \
+    build/bin/solar-race --vehicle sr7 --model mapped --bwsc-2025-timing \
       --route data/routes/outback-2025-style.csv --weather posterior \
       --seed 2025 --trials 500 --reserve-target-pct 15 --reserve-slow-kmh 65 \
       --rain-multiplier "$rain" --reserve-strategy "$rule" > "${rule}-${rain}.csv"

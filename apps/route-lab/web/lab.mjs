@@ -11,6 +11,8 @@ const feedback = document.querySelector("#run-feedback");
 const replay = document.querySelector("#replay");
 const play = document.querySelector("#play");
 const nextRest = document.querySelector("#next-rest");
+const nextCharge = document.querySelector("#next-charge");
+const raceSpec = document.querySelector("#race-spec");
 const raceDay = document.querySelector("#race-day");
 const clockDisplay = document.querySelector("#race-clock");
 const activePolicy = document.querySelector("#active-policy");
@@ -125,7 +127,8 @@ function renderReplay() {
   else analytics.searchParams.delete("at");
   if (analytics.href !== analyticsLinks[1].href) analyticsLinks[1].href = analytics.href;
   renderTelemetry(selected, positions[selected]);
-  nextRest.disabled = !nextControlHour();
+  nextRest.disabled = nextControlHour() === undefined;
+  nextCharge.disabled = nextChargeHour() === undefined;
   for (const row of readouts.children) {
     const state = positions[row.dataset.policy];
     row.setAttribute("aria-pressed", String(row.dataset.policy === selected));
@@ -159,11 +162,20 @@ function nextControlHour() {
   )?.race_arrive_hours;
 }
 
+function nextChargeHour() {
+  const events = current.trace.logs[logPolicy.value];
+  const now = Number(leg.value);
+  const arrival = events.find((event, index) =>
+    event.overnight_hours > 0 && events[index + 1]?.external_charge_wh > 0 &&
+    event.race_arrive_hours + event.control_hours > now + 1e-6);
+  return arrival ? arrival.race_arrive_hours + arrival.control_hours + 1e-6 : undefined;
+}
+
 function renderTelemetry(policy, state) {
-  const { event, phase, restRemaining } = state;
+  const { event, phase, restRemaining, externalChargeWh = 0 } = state;
   const place = current.trace.points[event.leg].name;
   activePolicy.textContent = labels[policy];
-  phaseDisplay.textContent = phaseLabels[phase];
+  phaseDisplay.textContent = externalChargeWh > 0 ? "Overnight top-up" : phaseLabels[phase];
   phaseDisplay.dataset.phase = phase;
   const remaining = Math.max(0, Math.ceil((restRemaining ?? 0) * 60 - 1e-4));
   const reasons = {
@@ -173,7 +185,8 @@ function renderTelemetry(policy, state) {
     finish: `Finished at ${place}`,
     depleted: `Battery depleted before ${place}`,
   };
-  placeDisplay.textContent = reasons[phase];
+  const topUp = externalChargeWh > 0 ? ` · ${(externalChargeWh / 1000).toFixed(2)} kWh before departure` : "";
+  placeDisplay.textContent = reasons[phase] + topUp;
   const driving = phase === "drive";
   const duration = event.race_arrive_hours - event.race_depart_hours;
   speedDisplay.textContent = `${numbers.format(replaySpeed(state))} km/h`;
@@ -228,13 +241,14 @@ function renderHistory({ points, logs }, selected, count) {
     const details = document.createElement("span");
     const wet = event.road_wetness > 0 ? ` · wetness ${percent(event.road_wetness)}` : "";
     const rain = event.rain_mm_h > 0 ? ` · rain ${event.rain_mm_h.toFixed(1)} mm/h` : "";
+    const topUp = event.external_charge_wh > 0 ? ` · overnight top-up ${(event.external_charge_wh / 1000).toFixed(2)} kWh` : "";
     const parked = event.parked_wh ? ` · parked solar ${(event.parked_wh / 1000).toFixed(2)} kWh` : "";
     const target = event.planned_arrival_soc_pct == null ? "" : ` / ${event.planned_arrival_soc_pct.toFixed(1)}% planned`;
     details.textContent = `${(event.mean_speed_kmh ?? event.speed_kmh).toFixed(1)} km/h avg · ${event.speed_kmh.toFixed(1)} km/h target · ${event.soc_pct.toFixed(1)}% SOC${target} · ` +
       `${event.irradiance_w_m2.toFixed(0)} W/m² · solar ${percent(event.solar_factor)} of clear sky · ` +
       `headwind ${event.headwind_mps.toFixed(1)} m/s${rain}${wet} · grade ${point.grade_pct.toFixed(2)}% · ` +
       `rolling ×${event.rolling_factor.toFixed(2)} · DC draw ${(event.demand_wh / 1000).toFixed(2)} kWh · ` +
-      `driving solar ${(event.solar_wh / 1000).toFixed(2)} kWh${parked}`;
+      `driving solar ${(event.solar_wh / 1000).toFixed(2)} kWh${parked}${topUp}`;
     item.append(heading, details);
     traceLog.append(item);
   }
@@ -279,8 +293,11 @@ function renderEnergy(points, event) {
     ["Regeneration credit", known ? -event.recovered_wh : null],
     ["Auxiliaries", event.auxiliary_wh], ["DC demand", event.demand_wh],
     ["Driving solar credit", -event.solar_wh],
-    ["Parked solar credit", -event.parked_wh], ["Energy spilled", event.spilled_wh],
-    ["Net battery draw", event.demand_wh - event.solar_wh - event.parked_wh + event.spilled_wh],
+    ["Parked solar credit", -event.parked_wh],
+    ["External overnight charge", -(event.external_charge_wh ?? 0)],
+    ["Energy spilled", event.spilled_wh],
+    ["Net battery draw", event.demand_wh - event.solar_wh - event.parked_wh
+      - (event.external_charge_wh ?? 0) + event.spilled_wh],
   ];
   energyBreakdown.append(energyList("At the wheels", wheels), energyList("DC and battery", dc));
 }
@@ -357,6 +374,12 @@ async function runExperiment() {
   try {
     const { data, settings, recorded } = await readRun();
     current = data;
+    const cruiser = data.energy_rules === "bwsc_2025_cruiser";
+    nextCharge.hidden = !cruiser;
+    if (cruiser) {
+      const pack = settings.pack_kwh === null ? "55 MJ pack (15.28 kWh)" : `${settings.pack_kwh} kWh pack`;
+      raceSpec.textContent = `2025 Cruiser · ${pack} · Overnight charging`;
+    }
     scenario = { version: 1, settings, ...data.reproduce };
     analyticsLinks.forEach((link) => {
       link.href = `./analytics.html${runQuery(settings, recorded)}`;
@@ -393,6 +416,7 @@ function jumpTo(hour) {
 }
 
 nextRest.addEventListener("click", () => jumpTo(nextControlHour()));
+nextCharge.addEventListener("click", () => jumpTo(nextChargeHour()));
 cameraButtons.forEach((button) => button.addEventListener("click", () => {
   camera = button.dataset.camera;
   cameraButtons.forEach((mode) => mode.setAttribute("aria-pressed", String(mode === button)));

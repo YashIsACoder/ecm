@@ -1,0 +1,67 @@
+/* Race control uses the map as the work surface and keeps telemetry in one rail. */
+body:has(#route-lab) {
+  --paper: #141714;
+  --sheet: #1b201b;
+  --ink: #f3f1e4;
+  --muted: #b2bcaf;
+  --line: #3d473c;
+  --teal: #d1ef73;
+  background: var(--paper);
+  font-family: "Avenir Next", "Instrument Sans", system-ui, sans-serif;
+}
+
+body:has(#route-lab) .top {
+  border-top: .22rem solid #a4c35a;
+  border-bottom-color: #353d32;
+}
+
+body:has(#route-lab) .brand .mark { border-radius: 0; box-shadow: none; transform: skewX(-12deg); }
+
+#route-lab { width: min(1350px, calc(100% - 2rem)); --track: #d1ef73; }
+#route-lab .intro { margin-bottom: 1.25rem; }
+#route-lab .intro h1 {
+  font-family: "Barlow Condensed", "Avenir Next Condensed", "Arial Narrow", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: .012em;
+  font-size: clamp(2rem, 6vw, 4.2rem);
+}
+#route-lab #race-spec { font: .75rem/1.6 var(--mono); color: #c9cdbf; max-width: none; }
+#route-lab .inline-setup { border: 0; border-block: 1px solid var(--line); border-radius: 0; background: none; }
+#route-lab .inline-setup > summary { padding-inline: .25rem; }
+#route-lab .replay { padding: 0; border: 0; border-radius: 0; background: none; }
+#route-lab .replay > .section-head { margin: 0; padding-block: .3rem .65rem; }
+#route-lab .replay > .section-head .readout { margin-bottom: .2rem; }
+
+#route-lab .timeline {
+  padding: .65rem .75rem;
+  border: 1px solid var(--line);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: .5rem 1rem;
+  background: #1c211b;
+}
+.playback-buttons { display: flex; flex-wrap: wrap; gap: .3rem; }
+#route-lab .playback-buttons button { min-height: 34px; padding: .28rem .51rem; }
+#route-lab .playback-buttons .play { min-width: 0; }
+#route-lab #next-charge { color: #d1ef73; }
+#route-lab .download, #route-lab .play { border-radius: .15rem; }
+#route-lab .race-dashboard { margin: 0; border-radius: 0; border-top: 0; background: #1b211a; }
+#route-lab .map-view, #route-lab .map-view button { border-radius: .15rem; }
+#route-lab .map-card h3 { letter-spacing: .01em; }
+#route-lab .map-clock { border-radius: .15rem; box-shadow: none; }
+#route-lab .map-sky { border-radius: .15rem; }
+#route-lab .telemetry-rail { border-left: 1px solid var(--line); }
+#route-lab .phase { border-radius: .15rem; }
+#route-lab .phase[data-phase="overnight"] { color: var(--track); }
+#route-lab .policy-readout { border-radius: .15rem; }
+#route-lab .policy-readout[aria-pressed="true"] { box-shadow: none; }
+#route-lab .energy-card, .playback-deck { border-radius: 0; }
+#route-lab .playback-deck { border-top: 0; }
+#route-lab .route-book button { border-radius: .15rem; }
+
+@media (max-width: 780px) {
+  #route-lab .telemetry-rail { border-left: 0; border-top: 1px solid var(--line); }
+}
+@media (max-width: 620px) {
+  #route-lab .timeline { grid-template-columns: minmax(0, 1fr) auto; }
+  #route-lab .playback-buttons { grid-column: 1 / -1; }
+}

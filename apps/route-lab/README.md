@@ -30,7 +30,8 @@ finish and reserve intervals, reach chart, battery history, and speed history.
 Choose 0.5×, 1×, 2× or 4× playback. **Race highlights** gives control holds more
 screen time and speeds through shared overnight parking. **Uniform time scale**
 plays the simulated clock at a constant rate. **Next REST** jumps to the
-selected strategy's next 30-minute control stop. **Follow car** keeps
+selected strategy's next 30-minute control stop. In SR7 Cruiser mode,
+**Next top-up** jumps to the next overnight recharge. **Follow car** keeps
 the selected strategy centred on the map. The route book jumps to recorded
 checkpoints for that car.
 
@@ -86,17 +87,21 @@ For one scenario, use the simulator directly.
 mkdir -p runs
 build/bin/solar-race --vehicle sr7 --model mapped \
   --route data/routes/outback-2025-style.csv --trials 2000 --seed 2025 \
-  --race-schedule --weather posterior --rain-multiplier 1 \
+  --bwsc-2025-timing --weather posterior --rain-multiplier 1 \
   --reserve-strategy envelope --reserve-target-pct 15 --reserve-slow-kmh 65 > runs/sr7.csv
 python3 apps/route-lab/analysis/analyse.py runs/sr7.csv
 ```
 
-Add `--trace-trial 15` to write one draw's leg log to stderr while the regular
+Add `--trace-trial 7` to write one draw's leg log to stderr while the regular
 CSV stays on stdout. Redirect stderr to a trace file when working from a shell.
 `--race-schedule` adds control and overnight waits to a separate elapsed-time
 column. The default CLI uses baseline weather, dry roads and driving-time
 results. The browser defaults to posterior weather with the observed August
 rain prior. Use **Rain exposure** to compare dry roads with a wetter scenario.
+The SR7 starts at the 55 MJ Cruiser storage limit and charges overnight at
+1,500 W battery-side by default. Use `--overnight-charge-w` to study limited
+supply. Trace and trial CSVs report external energy separately from solar.
+[SR7 inputs and assumptions](docs/sunswift-profiles.md)
 
 The binary embeds the default outback fixture, so it runs from any working
 directory without a `--route` argument. Supply `--route PATH` for your own

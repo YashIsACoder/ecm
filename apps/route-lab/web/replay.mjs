@@ -33,10 +33,12 @@ export function traceAt(events, hours) {
     const endControl = event.race_arrive_hours + event.control_hours;
     const overnight = hours >= endControl && event.overnight_hours > 0;
     const end = overnight ? next.race_depart_hours : Math.min(endControl, next.race_depart_hours);
-    const fraction = overnight ? (hours - endControl) / (end - endControl) : 0;
+    const externalChargeWh = overnight ? (next.external_charge_wh ?? 0) : 0;
+    const fraction = overnight && externalChargeWh === 0 ? (hours - endControl) / (end - endControl) : 0;
     return {
       distance: event.distance_km,
-      soc: overnight ? interpolate(event.soc_pct, next.depart_soc_pct, fraction) : event.soc_pct,
+      soc: interpolate(event.soc_pct, next.depart_soc_pct, fraction),
+      externalChargeWh,
       reached: index + 1, phase: overnight ? "overnight" : "control",
       restRemaining: Math.max(0, end - hours), event,
     };
@@ -328,8 +330,8 @@ export function drawRouteMap(canvas, trace, positions, selected, night, hour = 0
   for (const [index, marker] of markers.entries()) {
     const { x, y, paint, state } = marker;
     if (!["control", "overnight"].includes(state.phase) || x < 0 || x > width || y < 0 || y > height) continue;
-    const label = state.phase === "control" ? "REST" : "PARKED";
-    const tagX = Math.max(29, Math.min(width - 29, x + (index - 1) * 30));
+    const label = state.phase === "control" ? "REST" : state.externalChargeWh > 0 ? "TOP-UP" : "PARKED";
+    const tagX = Math.max(32, Math.min(width - 32, x + (index - 1) * 30));
     const tagY = Math.max(10, y - 24 - (index % 2) * 15);
     const half = ctx.measureText(label).width / 2 + 5;
     polyline(ctx, [[x, y - 8], [tagX, tagY + 5]]);
@@ -381,7 +383,7 @@ export function drawTelemetryHistory(canvas, logs, hours, horizon, positions, mo
   }
   for (const [name, events] of Object.entries(logs)) {
     const points = [];
-    for (const event of events) {
+    for (const [index, event] of events.entries()) {
       const { race_depart_hours: depart, race_arrive_hours: arrive } = event;
       if (speedMode) {
         const speed = event.mean_speed_kmh ?? event.speed_kmh;
@@ -391,6 +393,9 @@ export function drawTelemetryHistory(canvas, logs, hours, horizon, positions, mo
           if (event !== events.at(-1)) points.push([x(arrive + event.control_hours + event.overnight_hours), y(0)]);
         }
       } else {
+        if (index > 0 && event.external_charge_wh > 0) {
+          points.push([x(depart), y(events[index - 1].soc_pct)]);
+        }
         points.push([x(depart), y(event.depart_soc_pct)], [x(arrive), y(event.soc_pct)]);
         if (event.control_hours) points.push([x(arrive + event.control_hours), y(event.soc_pct)]);
       }

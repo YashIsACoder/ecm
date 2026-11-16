@@ -53,7 +53,7 @@
               <caption>Median across all simulated trials</caption>
               <thead>
                 <tr><th scope="col">Strategy</th><th scope="col">Distance</th><th scope="col">Final charge</th>
-                <th scope="col">Min. charge</th><th scope="col">DC demand</th><th scope="col">Solar</th><th scope="col">Spill</th></tr>
+                <th scope="col">Min. charge</th><th scope="col">DC demand</th><th scope="col">Solar</th><th scope="col">Overnight top-up</th><th scope="col">Spill</th></tr>
               </thead>
               <tbody id="trial-diagnostics"></tbody>
             </table>
@@ -72,6 +72,7 @@
       <ul class="legend" aria-label="Chart series">
         <li><i class="steady"></i>Steady</li><li><i class="push"></i>Push</li><li><i class="reserve"></i>Reserve-first</li>
       </ul>
+      <p id="cruiser-chart-note" class="field-note" hidden>Vertical steps mark overnight charge credited at the next departure.</p>
       <canvas id="battery" role="img" aria-label="State of charge by elapsed race time for the three strategies, with a dashed 15 percent reserve line."></canvas>
       <div class="history-scrub">
         <label for="history-time">Inspect race time</label>

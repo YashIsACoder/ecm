@@ -83,7 +83,7 @@ caption { text-align: left; color: var(--muted); font: .74rem var(--mono); margi
 .timeline output { font: .76rem var(--mono); text-align: right; }
 .play { min-width: 7.8rem; font-size: .84rem; }
 .race-dashboard { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr); gap: .8rem; margin: 1rem 0; }
-.map-card, .battery-card, .energy-card { min-width: 0; background: var(--field); border: 1px solid var(--line); margin: 0; }
+.map-card, .energy-card { min-width: 0; background: var(--field); border: 1px solid var(--line); margin: 0; }
 .panel-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .3rem .8rem; padding: .85rem .9rem .4rem; }
 .panel-heading h3 { font-size: .98rem; }
 .panel-heading span, .map-card figcaption { color: var(--muted); font: .68rem/1.5 var(--mono); }
@@ -254,8 +254,7 @@ a:focus-visible { outline: 2px solid var(--blue); outline-offset: 4px; }
 #route-lab .intro p { margin-top: .65rem; }
 #route-lab .replay { padding: clamp(.85rem, 2.45vw, 1.65rem); border-radius: 1.5rem; border-color: #52705c48; background: linear-gradient(155deg, #1a3124, #121f19 46%, #101d17); }
 #route-lab .race-dashboard { gap: 0; grid-template-columns: minmax(0, 1.8fr) minmax(270px, 1fr); border: 1px solid #5979645f; border-radius: 1.1rem; overflow: hidden; background: #102018; }
-#route-lab .map-card, #route-lab .battery-card { border: 0; background: none; }
-#route-lab .battery-card { border-left: 1px solid #5979645f; padding: .3rem; background: radial-gradient(100% 110% at 70% 10%, #2942344d, transparent 73%); }
+#route-lab .map-card { border: 0; background: none; }
 #route-lab .panel-heading { padding: .82rem 1rem .64rem; }
 #route-lab figcaption { padding: .55rem .95rem; }
 #route-lab .weather-strip { row-gap: .7rem; }
@@ -280,7 +279,6 @@ a:focus-visible { outline: 2px solid var(--blue); outline-offset: 4px; }
 .history-switch button { border-radius: .4rem; }
 @media (max-width: 745px) {
   #route-lab .race-dashboard { grid-template-columns: 1fr; }
-  #route-lab .battery-card { border-left: 0; border-top: 1px solid #5979645f; }
   .replay-options { justify-content: flex-start; }
 }
 @media (max-width: 520px) {
@@ -324,7 +322,6 @@ a:focus-visible { outline: 2px solid var(--blue); outline-offset: 4px; }
 .route-book button[data-passed="true"]:enabled { color: var(--track); }
 @media (max-width: 780px) {
   #route-lab .race-dashboard { grid-template-columns: 1fr; }
-  #route-lab .battery-card { border-left: 0; border-top: 1px solid #5979645f; }
   #route-lab .weather-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   #route-map { height: clamp(350px, 66vw, 500px); }
 }

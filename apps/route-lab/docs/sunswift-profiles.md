@@ -1,40 +1,66 @@
 # Sunswift scenarios
 
-| Input | SR7 | SR8 |
+| Input | SR7 · 2025 Cruiser | SR8 · provisional |
 | --- | ---: | ---: |
-| Effective mass used in the lab | 500 kg | 850 kg |
+| Effective driving mass | 660 kg | 850 kg |
 | Drag coefficient / frontal area | 0.095 / 1.40 m² | 0.18 / 1.55 m² |
 | Rolling coefficient / effective wheel radius | 0.005 / 0.27 m | 0.007 / 0.31 m |
 | Auxiliary draw | 150 W | 250 W |
-| Usable battery capacity | 38 kWh | 45 kWh |
+| Default battery capacity | 55 MJ (about 15.28 kWh) | 45 kWh |
+| Initial charge | 100% | 95% |
+| External overnight charging | 1.5 kW battery-side default | — |
 | Fixed motoring / regeneration efficiency | 0.91 / 0.60 | 0.91 / 0.62 |
 | Regenerative power cap | 2.5 kW | 4.0 kW |
 | PV area / efficiency / system factor | 4.8 m² / 0.22 / 0.92 | 4.5 m² / 0.23 / 0.92 |
 
-UNSW published the SR7 race-preparation mass and drag coefficient. A
-separate UNSW-hosted technical presentation describes an SR7 array with
-4.8 m² of modules at roughly 22% efficiency. The lab treats the other SR7
-values, including usable pack capacity, as scenario assumptions.
+The SR7 driving mass treats UNSW's published 500 kg as the vehicle mass and
+adds two 80 kg ballasted occupants. The drag coefficient is published.
+A UNSW-hosted technical presentation describes an SR7 solar array
+with 4.8 m² of modules at roughly 22% efficiency. Frontal area, tyres,
+auxiliary draw, the motor map and battery-side charger power are scenario
+assumptions.
 [UNSW SR7 race profile](https://www.unsw.edu.au/newsroom/news/2025/08/Sunswift-Bridgestone-World-Solar-Challenge-2025) ·
 [UNSW-hosted PV seminar](https://www2.pv.unsw.edu.au/videos/John-Rodriguez-11April2025/slides/John-Rodriguez-The-Realities-of-Vehicle-Integrated-PV.pdf)
 
+The 55 MJ cap is the 2025 Cruiser nominal storage limit. The default
+assumes the full nominal capacity is usable. Use `--pack-kwh` or
+`Config::capacity_wh` to model a smaller usable window. The rulebook
+allows external charging between driving days. After crediting parked
+solar, the model takes at most the smaller of the remaining pack capacity
+and charger power times parked hours. A pack depleted on a leg ends the
+trial. [2025 BWSC regulations, §§2.5–2.8 and 3.19](https://worldsolarchallenge.org/files/3297_2025_bwsc_regulations_release_v20_published_28_october_2024.pdf)
+
 All numerical SR8 inputs are provisional. UNSW describes SR8 as a
-solar, battery and hydrogen fuel-cell design. The lab's scenario covers
-its battery and solar energy only. Both presets use the same illustrative
-motoring map in mapped mode. [UNSW Sunswift project](https://www.unsw.edu.au/challeng/vertically-integrated-projects/explore-vertically-integrated-projects/sunswift-racing)
+solar, battery and hydrogen fuel-cell design. This scenario covers
+battery and solar only. [UNSW Sunswift project](https://www.unsw.edu.au/challeng/vertically-integrated-projects/explore-vertically-integrated-projects/sunswift-racing)
 
-## Example comparison
+## Physics check
 
-Paired runs used 2,000 draws, seed `2025`, the reserve-first policy and
-an Apple Clang 17 / libc++ build.
+At 82 km/h on a flat road without headwind or solar, the SR7 fixed-efficiency
+inputs imply 2.41 kWh per 100 km of DC demand. This comes from wheel work
+against aerodynamic drag and rolling resistance, divided by motoring
+efficiency, plus 150 W of auxiliaries over the drive time. The gust-aware
+mode integrates wind load around the forecast headwind.
+[Route estimator equations](../../../docs/route-models.md)
 
-| Scenario and route | Segment finishes | Cycle finishes | Mapped finishes |
+The recorded draw illustrates the daily energy budget. On Day 4 Steady
+reaches the overnight stop with 1.6% charge. Push depletes on the same stage.
+Reserve-first reaches that overnight stop with 11.1%. These are outputs of
+the synthetic itinerary and the published-input scenario. Matching observed
+race traces requires usable pack, vehicle load and weather telemetry.
+
+## Model sensitivity
+
+All four models ran the same 500 August-prior draws with seed 2025, timed
+stages and a 15% reserve target for the energy envelope. This compares
+finish counts from the recorded lab configuration.
+
+| Estimator | Steady | Push | Reserve-first |
 | --- | ---: | ---: | ---: |
-| SR7, 3,020 km outback fixture | 781 | 758 | 696 |
-| SR8, 1,150 km rolling fixture | 595 | 585 | 675 |
+| Segment | 464 | 261 | 499 |
+| Cycle | 462 | 255 | 499 |
+| Mapped | 471 | 265 | 499 |
+| Gust-aware | 471 | 263 | 499 |
 
-The mapped model changed SR7 completion by −4.2 percentage points
-relative to segment (95% paired interval −5.2 to −3.4) and SR8 by +4.0
-points (+3.1 to +5.0). These are sensitivity results for two synthetic
-experiments. They show that changing an efficiency assumption can shift
-completion near a battery limit. [Reproduction commands](../README.md)
+The output moves with the modelling assumptions, particularly for the Push
+policy near the daily energy limit. [Reproduction commands](../README.md)

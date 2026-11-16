@@ -1,6 +1,6 @@
 export const defaultSettings = Object.freeze({
   route: "outback", vehicle: "sr7", model: "mapped", weather: "posterior",
-  pack_kwh: null, trials: 500, seed: "2025", trace_trial: 15,
+  pack_kwh: null, trials: 500, seed: "2025", trace_trial: 7,
   steady_kmh: 82, push_kmh: 92, reserve_strategy: "tiers",
   reserve_fast_kmh: 92, reserve_medium_kmh: 85, reserve_slow_kmh: 75, reserve_target_pct: 35,
   array_m2: null, cell_efficiency_pct: null, system_efficiency_pct: null, parked_wh_m2: null,

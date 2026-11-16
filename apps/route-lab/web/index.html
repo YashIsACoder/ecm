@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sunswift Route Lab</title>
   <link rel="stylesheet" href="./lab.css">
+  <link rel="stylesheet" href="./race-control.css">
   <script src="./lab.mjs" type="module"></script>
 </head>
 <body>
@@ -16,7 +17,7 @@
     <div class="intro">
       <div>
         <h1>Sunswift Route Lab</h1>
-        <p>Run three pacing strategies down the Stuart Highway and see where they gain time or run out of charge.</p>
+        <p id="race-spec">Compare three pacing strategies on the same weather draw.</p>
       </div>
     </div>
     <details id="setup" class="inline-setup">
@@ -37,8 +38,11 @@
         </div>
       </div>
       <div class="timeline">
-        <button type="button" id="play" class="play">Play replay</button>
-        <button type="button" id="next-rest" class="download">Next REST</button>
+        <div class="playback-buttons">
+          <button type="button" id="play" class="play">Play replay</button>
+          <button type="button" id="next-rest" class="download">Next REST</button>
+          <button type="button" id="next-charge" class="download" hidden>Next top-up</button>
+        </div>
         <label for="leg" class="sr-only">Elapsed race time</label>
         <input id="leg" type="range" min="0" max="0" step="any" value="0">
         <output id="leg-label" for="leg"></output>
@@ -60,7 +64,7 @@
           </div>
           <figcaption id="map-caption"></figcaption>
         </figure>
-        <div class="battery-card">
+        <div class="telemetry-rail">
           <section class="telemetry" aria-label="Selected strategy telemetry">
             <div class="telemetry-head"><strong id="active-policy"></strong><span id="race-phase" class="phase"></span></div>
             <p id="race-place"></p>

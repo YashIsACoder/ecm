@@ -23,7 +23,11 @@ const overnight = steady.find(({ overnight_hours }) => overnight_hours > 0);
 const parked = traceAt(steady, overnight.race_arrive_hours + overnight.control_hours + 1);
 assert.equal(parked.phase, "overnight");
 assert.equal(parked.distance, overnight.distance_km);
+assert.equal(parked.soc, overnight.soc_pct);
+assert.ok(parked.externalChargeWh > 0);
 assert.equal(traceAt(steady, 24).phase, "drive");
+assert.equal(traceAt(steady, 24).soc, 100);
+assert.equal(logs.push.at(-1).depleted, 1);
 assert.deepEqual(raceClock(13), { day: 1, clock: "21:00", night: true });
 assert.deepEqual(raceClock(24), { day: 2, clock: "08:00", night: false });
 

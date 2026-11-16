@@ -52,6 +52,7 @@ function addPairedCell(row, values) {
 
 function render({ data, settings, recorded }) {
   current = data;
+  document.querySelector("#cruiser-chart-note").hidden = data.energy_rules !== "bwsc_2025_cruiser";
   document.querySelector("#back-map").href = `./${runQuery(settings, recorded)}`;
   feedback.hidden = !recorded;
   if (recorded) feedback.textContent = "Recorded SR7 run";
@@ -72,8 +73,8 @@ function render({ data, settings, recorded }) {
     addCell(diagnosticRow, `${numbers.format(metrics.distance_km)} km`);
     addCell(diagnosticRow, `${metrics.finish_soc_pct.toFixed(1)}%`);
     addCell(diagnosticRow, `${metrics.min_soc_pct.toFixed(1)}%`);
-    for (const key of ["demand_kwh", "solar_kwh", "spilled_kwh"]) {
-      addCell(diagnosticRow, `${metrics[key].toFixed(2)} kWh`);
+    for (const key of ["demand_kwh", "solar_kwh", "external_charge_kwh", "spilled_kwh"]) {
+      addCell(diagnosticRow, `${(metrics[key] ?? 0).toFixed(2)} kWh`);
     }
     if (policy.name !== "steady") {
       const pairedRow = namedRow(paired, policy.name);
@@ -177,6 +178,7 @@ function drawHistory() {
 historyButtons.forEach((button) => button.addEventListener("click", () => {
   mode = button.dataset.history;
   const speed = mode === "speed";
+  document.querySelector("#cruiser-chart-note").hidden = speed || current?.energy_rules !== "bwsc_2025_cruiser";
   historyTitle.textContent = speed ? "Speed history · km/h" : "Battery history";
   battery.setAttribute("aria-label", speed
     ? "Leg-average speed by elapsed race time for all three strategies. Speed is zero during rests."

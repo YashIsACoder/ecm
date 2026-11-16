@@ -33,10 +33,14 @@ def main() -> None:
                 bundle = json.load(response)
                 assert bundle["settings"]["reserve_strategy"] == "envelope"
                 demo = bundle["result"]
-                assert demo["trace"]["draw"] == 15 and demo["trace"]["route"] == "outback"
+                assert demo["trace"]["draw"] == 7 and demo["trace"]["route"] == "outback"
                 assert "race_arrive_hours" in demo["trace"]["logs"]["steady"][0]
                 demo_events = demo["trace"]["logs"]["steady"]
+                assert demo["energy_rules"] == "bwsc_2025_cruiser"
                 assert any(event["control_hours"] == 0.5 for event in demo_events)
+                assert demo_events[0]["depart_soc_pct"] == 100
+                assert any(event["external_charge_wh"] > 0 and event["depart_soc_pct"] == 100 for event in demo_events)
+                assert demo["trace"]["logs"]["push"][-1]["depleted"] == 1
                 assert bundle["settings"]["rain_multiplier"] == 1
                 assert demo_events[0]["rain_mm_h"] == 0 and 0 < demo_events[0]["rain_probability"] < 0.001
             with urlopen(url + "/methods.html", timeout=5) as methods:
@@ -117,6 +121,16 @@ def main() -> None:
                 trace_with_gust = json.load(response)["trace"]["logs"]["steady"][0]
             assert trace_with_gust["drag_wh"] > baseline_trace["drag_wh"]
             assert trace_with_gust["race_arrive_hours"] == baseline_trace["race_arrive_hours"]
+
+            oversize = Request(url + "/api/run", json.dumps(wet_case | {"pack_kwh": 38}).encode(),
+                               {"Content-Type": "application/json"})
+            try:
+                urlopen(oversize, timeout=5).close()
+            except HTTPError as error:
+                with error:
+                    assert error.code == 400 and "55 MJ" in json.load(error)["error"]
+            else:
+                raise AssertionError("lab accepted a pack larger than the Cruiser limit")
 
             request["trace_trial"] = 9
             rejected = Request(url + "/api/run", json.dumps(request).encode(), {"Content-Type": "application/json"})

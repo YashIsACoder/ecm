@@ -27,6 +27,7 @@ ROUTE_FILES = {"outback": "outback-2025-style.csv", "rolling": "rolling-1150.csv
 ASSETS = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/lab.css": ("lab.css", "text/css; charset=utf-8"),
+    "/race-control.css": ("race-control.css", "text/css; charset=utf-8"),
     "/lab.mjs": ("lab.mjs", "text/javascript; charset=utf-8"),
     "/configure.html": ("configure.html", "text/html; charset=utf-8"),
     "/configure.mjs": ("configure.mjs", "text/javascript; charset=utf-8"),
@@ -42,8 +43,9 @@ ASSETS = {
     "/demo.json": ("demo.json", "application/json"),
 }
 MAX_TRIALS = 3000
+CRUISER_MAX_KWH = (55_000_000.0 / 3600.0) / 1000.0
 DEMO = {"route": "outback", "vehicle": "sr7", "model": "mapped", "trials": 500,
-        "seed": "2025", "trace_trial": 15, "pack_kwh": None, "weather": "posterior",
+        "seed": "2025", "trace_trial": 7, "pack_kwh": None, "weather": "posterior",
         "reserve_strategy": "envelope", "reserve_target_pct": 15, "reserve_slow_kmh": 65, "rain_multiplier": 1}
 
 
@@ -84,12 +86,15 @@ def experiment_arguments(request: dict) -> tuple[list[str], Path, int]:
     if not isinstance(seed, str) or not re.fullmatch(r"[0-9]{1,20}", seed) or int(seed) >= 2**64:
         raise ValueError("Seed must be a nonnegative 64-bit integer.")
     path = ROUTES / ROUTE_FILES[route]
+    schedule = "--bwsc-2025-timing" if vehicle == "sr7" else "--race-schedule"
     args = ["--route", str(path), "--vehicle", vehicle, "--model", model, "--trials", str(trials),
-            "--seed", seed, "--trace-trial", str(trace), "--weather", weather, "--race-schedule"]
+            "--seed", seed, "--trace-trial", str(trace), "--weather", weather, schedule]
     pack = request.get("pack_kwh")
     if pack is not None:
         if type(pack) not in (int, float) or pack <= 0 or not math.isfinite(pack * 1000.0):
             raise ValueError("Battery capacity must be a positive finite number of kWh.")
+        if vehicle == "sr7" and pack > CRUISER_MAX_KWH:
+            raise ValueError("2025 Cruiser storage is capped at 55 MJ. Leave the pack field blank to use the exact limit.")
         args += ["--pack-kwh", str(pack)]
 
     reserve_strategy = request.get("reserve_strategy", "tiers")
@@ -154,6 +159,9 @@ def run_case(executable: Path, request: dict) -> dict:
             if any(value is None for value in values):
                 raise RuntimeError(f"The simulator omitted {name_of_metric}.")
             metrics[name_of_metric] = statistics.median(values)
+        if request["vehicle"] == "sr7" and any(trial.external_charge_kwh is None for trial in trials):
+            raise RuntimeError("The simulator omitted Cruiser charging totals.")
+        metrics["external_charge_kwh"] = statistics.median(trial.external_charge_kwh or 0.0 for trial in trials)
         policies.append({
             "name": name, "finishes": len(times), "completion_ci": wilson(len(times), count),
             "reserve_breaches": breaches, "reserve_ci": wilson(breaches, count),
@@ -200,6 +208,7 @@ def run_case(executable: Path, request: dict) -> dict:
     portable_args = [*args]
     portable_args[1] = f"data/routes/{route.name}"
     return {
+        "energy_rules": "bwsc_2025_cruiser" if request["vehicle"] == "sr7" else "scenario",
         "trials": count, "distances_km": distances,
         "reproduce": {"arguments": portable_args, "route_sha256": hashlib.sha256(route.read_bytes()).hexdigest()}, "policies": policies,
         "completion_vs_steady": comparisons, "reserve_vs_steady": reserve_comparisons, "csv": completed.stdout,

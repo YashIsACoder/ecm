@@ -29,8 +29,9 @@ then replay one weather draw and inspect the C++ leg logs. The browser shows
 finish rates, reserve risk and how far each pacing policy gets. A static
 homepage version replays a recorded run. [Lab guide and homepage integration](apps/route-lab/README.md)
 
-The checked-in routes are synthetic. The SR7 preset uses published figures
-where available, and SR8 models a provisional battery-and-solar scenario.
+The routes are synthetic. SR7 defaults to the 2025 Cruiser limit of 55 MJ
+and models external charging overnight. SR8 is a provisional
+battery-and-solar scenario.
 [SR7 and SR8 inputs and results](apps/route-lab/docs/sunswift-profiles.md)
 
 ## Use the library

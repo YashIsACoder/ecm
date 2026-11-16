@@ -26,6 +26,7 @@ class Trial:
     solar_kwh: Optional[float] = None
     spilled_kwh: Optional[float] = None
     race_hours: Optional[float] = None
+    external_charge_kwh: Optional[float] = None
 
 
 def bit(value: str) -> bool:
@@ -74,6 +75,7 @@ def read_trial_stream(file: TextIO, source: str) -> dict[int, dict[str, Trial]]:
                 optional_number(row, "demand_kwh"), optional_number(row, "solar_kwh"),
                 optional_number(row, "spilled_kwh"),
                 optional_number(row, "race_hours"),
+                optional_number(row, "external_charge_kwh"),
             )
         except (TypeError, ValueError) as error:
             raise ValueError(f"{source}:{rows.line_num}: {error}") from error
