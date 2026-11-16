@@ -7,9 +7,11 @@ export const policyStyles = {
 };
 
 const interpolate = (start, end, ratio) => start + (end - start) * ratio;
+const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
+const dayStartHour = 8;
 
 export function raceClock(hours) {
-  const minutes = Math.floor((hours + 8) * 60 + 1e-7);
+  const minutes = Math.floor((hours + dayStartHour) * 60 + 1e-7);
   const day = Math.floor(minutes / 1440) + 1;
   const hour = Math.floor(minutes / 60) % 24;
   const clock = [hour, minutes % 60].map((part) => String(part).padStart(2, "0")).join(":");
@@ -66,8 +68,9 @@ export function playbackTimeline(logs) {
     const start = points[index];
     const duration = hour - start;
     const phases = all.map((events) => traceAt(events, (start + hour) / 2).phase);
+    // Compress a parked night while leaving time to see dusk and dawn.
     const weight = phases.includes("control") ? duration * 3
-      : phases.includes("drive") ? duration : Math.min(duration, .65);
+      : phases.includes("drive") ? duration : Math.min(duration, 3.25);
     timeline.push({ hour, offset: timeline.at(-1).offset + weight });
   }
   return timeline;
@@ -197,34 +200,53 @@ export function skyCondition(event) {
   return "Overcast";
 }
 
-function drawWeather(ctx, centre, weather, night, hour) {
+function drawWeather(ctx, centre, weather, dark, seconds) {
   const [x, y] = centre;
-  const cloud = 1 - weather.solar_factor;
+  const cloud = 1 - clamp(weather.solar_factor, 0, 1);
   const rain = weather.rain_mm_h ?? 0;
-  const radius = 38 + 92 * cloud + Math.min(32, rain * 2);
-  const gradient = ctx.createRadialGradient(x, y, 2, x, y, radius);
-  gradient.addColorStop(0, rain > 0 ? "#90b7da76" : night ? "#8291bd57"
-    : cloud > .28 ? "#bfd0d263" : "#e9c45e58");
-  gradient.addColorStop(1, "#00000000");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(x - radius, y - radius, 2 * radius, 2 * radius);
+  const wind = clamp(weather.headwind_mps, -20, 20);
+  const radius = 50 + 72 * cloud + Math.min(28, rain * 2);
+  const drift = Math.sin(seconds * .36) * (12 + Math.abs(wind) * .5);
+  const intensity = rain > 0 ? 1 : clamp((cloud - .1) * 1.6, 0, 1);
+  const cloudShade = rain > 0 ? (dark ? "#809cb9" : "#647c8c") : (dark ? "#9cb2b8" : "#f9fbef");
+
+  if (intensity > 0) {
+    ctx.save();
+    for (const [offsetX, offsetY, scale] of [[-.44, -.13, .74], [.34, .05, .66], [.03, -.23, .8]]) {
+      const cx = x + offsetX * radius + drift;
+      const cy = y + offsetY * radius + 6 * Math.sin(seconds * .48 + offsetX * 4);
+      const size = radius * scale;
+      const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, size);
+      gradient.addColorStop(0, cloudShade);
+      gradient.addColorStop(1, `${cloudShade}00`);
+      ctx.globalAlpha = intensity * (rain > 0 ? .31 : .54);
+      ctx.fillStyle = gradient;
+      ctx.fillRect(cx - size, cy - size, 2 * size, 2 * size);
+    }
+    ctx.restore();
+  }
 
   if (rain <= 0) return;
   ctx.save();
-  ctx.translate(x, y);
+  ctx.translate(x + drift, y);
   ctx.beginPath();
-  ctx.ellipse(0, 0, radius * .77, radius * .58, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 0, radius * .84, radius * .63, 0, 0, Math.PI * 2);
   ctx.clip();
-  const drops = Math.min(45, 11 + Math.round(rain * 3));
-  ctx.strokeStyle = night ? "#cae1fd86" : "#406d905f";
-  ctx.lineWidth = 1;
+  const drops = Math.min(70, 12 + Math.round(rain * 8));
+  const length = Math.min(17, 7 + rain);
+  const lean = 3 + wind * .3;
+  const span = radius * 2;
+  ctx.globalAlpha = clamp(.4 + rain * .14, .4, .85);
+  ctx.strokeStyle = dark ? "#d3e8ff" : "#305f82";
+  ctx.lineWidth = 1.15;
+  ctx.lineCap = "round";
   ctx.beginPath();
   for (let drop = 0; drop < drops; drop += 1) {
-    const span = radius * 2;
-    const localX = (drop * 29.41 + hour * weather.headwind_mps * 1.5 + span * 1000) % span - radius;
-    const localY = (drop * 41.7 + hour * 840) % span - radius;
+    const fall = (drop * .75488 + seconds * (.72 + (drop % 5) * .11)) % 1;
+    const localX = ((drop * .61803) % 1) * span - radius + lean * (fall - .5) * 5;
+    const localY = fall * span - radius;
     ctx.moveTo(localX, localY);
-    ctx.lineTo(localX - 5, localY + 11);
+    ctx.lineTo(localX + lean, localY + length);
   }
   ctx.stroke();
   ctx.restore();
@@ -240,6 +262,42 @@ const atlasPalettes = {
     grid: "#dfe2b221", place: "#f1e9ca", halo: "#31443e", route: "#bd9c7d", travelled: "#ffc69c",
   },
 };
+
+const lightStops = [
+  [0, atlasPalettes.night],
+  [4.5, atlasPalettes.night],
+  [6.4, { ...atlasPalettes.day, water: "#a6acaa", landNorth: "#d4ba98", landSouth: "#b8ae99" }],
+  [9.5, atlasPalettes.day],
+  [14.5, atlasPalettes.day],
+  [17.6, { ...atlasPalettes.day, water: "#a3a9b2", landNorth: "#debd91", landSouth: "#bf9d80" }],
+  [20, atlasPalettes.night],
+  [24, atlasPalettes.night],
+];
+
+function blendHex(a, b, weight) {
+  return "#" + a.slice(1).match(/../g).map((channel, index) => {
+    const offset = 1 + 2 * index;
+    return Math.round(interpolate(parseInt(channel, 16), parseInt(b.slice(offset, offset + 2), 16), weight))
+      .toString(16).padStart(2, "0");
+  }).join("");
+}
+
+export function atlasLighting(elapsedHours) {
+  const hour = (elapsedHours + dayStartHour) % 24;
+  const next = lightStops.findIndex(([stop]) => stop > hour);
+  const [startHour, start] = lightStops[next - 1];
+  const [endHour, end] = lightStops[next];
+  const fraction = (hour - startHour) / (endHour - startHour);
+  const weight = fraction * fraction * (3 - 2 * fraction);
+  const palette = start === end ? { ...start } : Object.fromEntries(
+    Object.entries(start).map(([name, color]) => [name, blendHex(color, end[name], weight)]),
+  );
+  const [red, green, blue] = palette.water.slice(1).match(/../g).map((channel) => parseInt(channel, 16));
+  const dark = .2126 * red + .7152 * green + .0722 * blue < 123;
+  palette.place = dark ? atlasPalettes.night.place : atlasPalettes.day.place;
+  const label = hour < 5 || hour >= 20 ? "Night" : hour < 8 ? "Dawn" : hour < 16.5 ? "Daylight" : "Dusk";
+  return { palette, dark, label };
+}
 
 function drawAtlas(ctx, width, height, project, geographic, palette, overview) {
   ctx.fillStyle = palette.water;
@@ -304,7 +362,7 @@ function drawAtlas(ctx, width, height, project, geographic, palette, overview) {
   ctx.globalAlpha = 1;
 }
 
-export function drawRouteMap(canvas, trace, positions, selected, night, hour = 0, camera = "overview") {
+export function drawRouteMap(canvas, trace, positions, selected, { lighting, motion, camera }) {
   const frame = prepare(canvas);
   if (!frame) return;
   const { ctx, width, height } = frame;
@@ -318,11 +376,10 @@ export function drawRouteMap(canvas, trace, positions, selected, night, hour = 0
     return [width / 2 + (x - focusX) * 2.7, height / 2 + (y - focusY) * 2.7];
   } : overview;
   const points = route.points.map(project);
-  const weather = active.event;
-  const palette = night ? atlasPalettes.night : atlasPalettes.day;
+  const { palette, dark } = lighting;
   drawAtlas(ctx, width, height, project, route.geographic, palette, camera === "overview");
   if (active.phase === "drive" || active.phase === "control") {
-    drawWeather(ctx, positionAt(points, kilometres, active.distance), weather, night, hour);
+    drawWeather(ctx, positionAt(points, kilometres, active.distance), active.event, dark, motion);
   }
   polyline(ctx, points);
   ctx.strokeStyle = palette.halo;
@@ -360,7 +417,7 @@ export function drawRouteMap(canvas, trace, positions, selected, night, hour = 0
     const label = point === 0 ? route.start : trace.points[point - 1].name;
     const left = index % 2 === 1 || x > width * .8;
     ctx.textAlign = left ? "right" : "left";
-    ctx.strokeStyle = palette.halo;
+    ctx.strokeStyle = dark ? atlasPalettes.night.halo : atlasPalettes.day.halo;
     ctx.lineWidth = 3;
     ctx.strokeText(label, x + (left ? -10 : 10), y + (point === 0 ? -8 : 0));
     ctx.fillStyle = palette.place;

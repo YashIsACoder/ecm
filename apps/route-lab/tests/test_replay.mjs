@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { defaultSettings, readSetupFile, settingsFromQuery, setupQuery } from "../web/scenario.mjs";
-import { checkpointHour, routeBook, playbackTimeline, raceClock, replaySpeed, skyCondition, traceAt, translateTime } from "../web/replay.mjs";
+import { atlasLighting, checkpointHour, drawRouteMap, routeBook, playbackTimeline, raceClock, replaySpeed, skyCondition, traceAt, translateTime } from "../web/replay.mjs";
 
-const { result: { trace: { logs, points } } } = JSON.parse(readFileSync(new URL("../web/demo.json", import.meta.url)));
+const { result: { trace } } = JSON.parse(readFileSync(new URL("../web/demo.json", import.meta.url)));
+const { logs, points } = trace;
 const steady = logs.steady;
 const control = steady.find(({ control_hours }) => control_hours > 0);
 const stops = routeBook(points, "Darwin");
@@ -31,6 +32,19 @@ assert.equal(logs.push.at(-1).depleted, 1);
 assert.deepEqual(raceClock(13), { day: 1, clock: "21:00", night: true });
 assert.deepEqual(raceClock(24), { day: 2, clock: "08:00", night: false });
 
+const atClock = (hour) => atlasLighting((hour + 16) % 24);
+const night = atClock(23);
+assert.deepEqual(atClock(24), night);
+assert.deepEqual(atlasLighting(24), atlasLighting(0));
+assert.equal(atClock(6).label, "Dawn");
+assert.equal(atClock(12).label, "Daylight");
+assert.equal(atClock(18).label, "Dusk");
+assert.equal(atClock(6).dark, false);
+assert.equal(night.dark, true);
+assert.notEqual(atClock(5.5).palette.water, atClock(6).palette.water);
+assert.notEqual(atClock(17.5).palette.water, atClock(18).palette.water);
+assert.notEqual(atClock(18).palette.landNorth, atClock(12).palette.landNorth);
+
 const timeline = playbackTimeline(logs);
 assert.ok(timeline.every(({ offset }, i) => i === 0 || timeline[i - 1].offset < offset));
 const testHour = control.race_arrive_hours + .25;
@@ -46,3 +60,34 @@ assert.deepEqual(readSetupFile(JSON.stringify({ version: 1, settings: setup })),
 assert.throws(() => readSetupFile(JSON.stringify({ version: 1, settings: { ...setup, seed: 15 } })));
 assert.equal(skyCondition({ rain_mm_h: 4, solar_factor: .95 }), "Rain");
 assert.equal(skyCondition({ rain_mm_h: 0, solar_factor: .72 }), "Partly cloudy");
+
+// Capture only clipped paths, which belong to the rain layer.
+globalThis.window = { devicePixelRatio: 1 };
+globalThis.getComputedStyle = () => ({ getPropertyValue: () => "" });
+let clipped = false;
+const drops = [];
+const gradient = () => ({ addColorStop() {} });
+const ctx = new Proxy({
+  clip: () => { clipped = true; },
+  restore: () => { clipped = false; },
+  moveTo: (x, y) => {
+    if (clipped) drops.push([x, y]);
+  },
+  createLinearGradient: gradient,
+  createRadialGradient: gradient,
+}, { get: (target, method) => target[method] ?? (() => {}) });
+const canvas = { clientWidth: 900, clientHeight: 540, getContext: () => ctx };
+const positions = Object.fromEntries(Object.entries(logs).map(([policy, events]) => [policy, traceAt(events, 0)]));
+const rainFrame = (rain, motion) => {
+  drops.length = 0;
+  const selected = positions.steady;
+  const wetPositions = { ...positions, steady: { ...selected, event: { ...selected.event, rain_mm_h: rain } } };
+  drawRouteMap(canvas, trace, wetPositions, "steady", { lighting: atClock(8), motion, camera: "overview" });
+  return drops.slice();
+};
+assert.equal(rainFrame(0, .25).length, 0);
+const drizzle = rainFrame(.4, 0);
+const shower = rainFrame(4, 0);
+assert.ok(drizzle.length > 0 && shower.length > drizzle.length);
+assert.deepEqual(rainFrame(4, 0), shower);
+assert.notDeepEqual(rainFrame(4, .25), shower);

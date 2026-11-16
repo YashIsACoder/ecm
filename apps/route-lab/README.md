@@ -33,12 +33,16 @@ plays the simulated clock at a constant rate. **Next REST** jumps to the
 selected strategy's next 30-minute control stop. In SR7 Cruiser mode,
 **Next top-up** jumps to the next overnight recharge. **Follow car** keeps
 the selected strategy centred on the map. The route book jumps to recorded
-checkpoints for that car.
+checkpoints for that car. The map follows the replay clock through dawn,
+daylight, dusk and night, including while the cars are parked.
 
 Select a strategy to see mean leg speed, target speed, generated solar power,
-irradiance, wind, rain, wetness and wet-road pace cap. As a leg completes, the
-native trace exposes its wheel work, DC and battery balance. Position and charge
-interpolate using native leg endpoints.
+irradiance, wind, rain, wetness and wet-road pace cap. A local cloud and rain
+overlay depicts the selected strategy's leg forecast. Drop density follows the
+simulated rain rate. Pausing freezes the weather animation, and the system's
+reduced-motion preference keeps particles still during playback. As a leg
+completes, the native trace exposes its wheel work, DC and battery balance.
+Position and charge interpolate using native leg endpoints.
 [BWSC corridor](https://worldsolarchallenge.org/about-us/route-map) ·
 [Natural Earth coastline](https://www.naturalearthdata.com/about/terms-of-use/)
 
@@ -65,9 +69,6 @@ python3 apps/route-lab/serve.py build/bin/solar-race \
   --export-demo apps/route-lab/web/demo.json
 build/bin/solar-race --forecast-report --seed 2025 > apps/route-lab/web/forecast-demo.json
 ```
-
-The lab's dark-green palette takes its cue from the team's public presentation
-of Sunswift 8. [Sunswift Racing](https://www.sunswift.com/)
 
 ## Batch experiments
 

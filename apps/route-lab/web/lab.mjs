@@ -1,7 +1,7 @@
 "use strict";
 
 import { routes } from "./map-data.mjs";
-import { checkpointHour, drawRouteMap, playbackTimeline, raceClock, replaySpeed, routeBook, skyCondition, traceAt, translateTime } from "./replay.mjs";
+import { atlasLighting, checkpointHour, drawRouteMap, playbackTimeline, raceClock, replaySpeed, routeBook, skyCondition, traceAt, translateTime } from "./replay.mjs";
 
 import { mountSetup } from "./configure.mjs";
 import { settingsFromQuery, setupQuery } from "./scenario.mjs";
@@ -57,10 +57,13 @@ let timeline;
 let scenario;
 let camera = "overview";
 let stops;
+let motion = 0;
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const phaseLabels = { drive: "On course", control: "REST", overnight: "Parked", finish: "Finished", depleted: "Depleted" };
 
 function resetReplay() {
   pauseReplay();
+  motion = 0;
   replay.hidden = false;
   historyKey = undefined;
   const { draw, logs, route } = current.trace;
@@ -127,7 +130,8 @@ function renderReplay() {
   const positions = Object.fromEntries(
     Object.entries(current.trace.logs).map(([name, events]) => [name, traceAt(events, hour)]),
   );
-  const { day, clock, night } = raceClock(hour);
+  const { day, clock } = raceClock(hour);
+  const lighting = atlasLighting(hour);
   raceDay.textContent = `Day ${day}`;
   clockDisplay.textContent = clock;
   legLabel.textContent = `${hour.toFixed(1)} / ${horizon.toFixed(1)} h`;
@@ -137,10 +141,11 @@ function renderReplay() {
   if (hour > 0) analytics.searchParams.set("at", hour.toFixed(6));
   else analytics.searchParams.delete("at");
   if (analytics.href !== analyticsLinks[1].href) analyticsLinks[1].href = analytics.href;
-  renderTelemetry(selected, positions[selected]);
+  renderTelemetry(selected, positions[selected], lighting.label);
   nextRest.disabled = nextControlHour() === undefined;
   nextCharge.disabled = nextChargeHour() === undefined;
-  replay.classList.toggle("is-night", night);
+  replay.classList.toggle("is-dark", lighting.dark);
+  replay.style.setProperty("--atlas-water", lighting.palette.water);
   for (const row of readouts.children) {
     const state = positions[row.dataset.policy];
     row.setAttribute("aria-pressed", String(row.dataset.policy === selected));
@@ -149,7 +154,7 @@ function renderReplay() {
   }
   const remaining = current.distances_km.at(-1) - positions[selected].distance;
   mapProgress.textContent = `${numbers.format(remaining)} km to finish`;
-  drawRouteMap(map, current.trace, positions, selected, night, hour, camera);
+  drawRouteMap(map, current.trace, positions, selected, { lighting, camera, motion: reducedMotion.matches ? 0 : motion });
   for (const { button, leg: stopLeg } of stops) {
     const arrival = checkpointHour(current.trace.logs[selected], stopLeg);
     button.disabled = arrival === undefined;
@@ -182,7 +187,7 @@ function nextChargeHour() {
   return arrival ? arrival.race_arrive_hours + arrival.control_hours + 1e-6 : undefined;
 }
 
-function renderTelemetry(policy, state) {
+function renderTelemetry(policy, state, lightLabel) {
   const { event, phase, restRemaining, externalChargeWh = 0 } = state;
   const place = current.trace.points[event.leg].name;
   activePolicy.textContent = labels[policy];
@@ -216,9 +221,8 @@ function renderTelemetry(policy, state) {
   cloudDisplay.textContent = weatherAvailable ? percent(event.solar_factor) : "—";
   const rain = event.rain_mm_h ?? 0;
   const wetness = event.road_wetness ?? 0;
-  const sky = weatherAvailable ? skyCondition(event) : phaseLabels[phase];
   mapSky.parentElement.dataset.rain = String(weatherAvailable && rain > 0);
-  mapSky.textContent = sky;
+  mapSky.textContent = weatherAvailable ? `${lightLabel} · ${skyCondition(event)}` : lightLabel;
   const rainRate = rain < .05 ? "<0.1" : rain.toFixed(1);
   rainDisplay.textContent = !weatherAvailable ? "—" : rain > 0 ? `${rainRate} mm/h` : "Dry";
   wetnessDisplay.textContent = weatherAvailable ? percent(wetness) : "—";
@@ -327,6 +331,7 @@ function toggleReplay() {
   }
   if (Number(leg.value) === Number(leg.max)) {
     leg.value = 0;
+    motion = 0;
     renderReplay();
   }
   if (Number(leg.max) === 0) {
@@ -335,6 +340,7 @@ function toggleReplay() {
   play.classList.add("is-playing");
   play.lastElementChild.textContent = "Pause replay";
   const start = performance.now();
+  let lastFrame = start;
   const schedule = clockMode.value === "uniform"
     ? [{ hour: 0, offset: 0 }, { hour: Number(leg.max), offset: Number(leg.max) }]
     : timeline;
@@ -343,6 +349,8 @@ function toggleReplay() {
   const duration = 32_000 / Number(rate.value);
   const advance = (now) => {
     const to = Math.min(end.offset, offset + (now - start) * end.offset / duration);
+    motion += Math.min(50, Math.max(0, now - lastFrame)) / 1000;
+    lastFrame = now;
     leg.value = translateTime(schedule, to, "offset", "hour");
     renderReplay();
     if (to === end.offset) {
@@ -448,6 +456,7 @@ leg.addEventListener("input", () => {
   renderReplay();
 });
 logPolicy.addEventListener("change", renderReplay);
+reducedMotion.addEventListener("change", renderReplay);
 
 new ResizeObserver(renderReplay).observe(map);
 runExperiment();

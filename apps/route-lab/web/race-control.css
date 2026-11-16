@@ -86,10 +86,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 #route-lab > .run-feedback { margin: 1rem max(3vw, 1rem); }
 
 .atlas-spread {
-  --atlas-ink: #23352a;
-  --atlas-muted: #566554;
+  --atlas-ink: #17231b;
+  --atlas-muted: #344438;
   --atlas-line: #2d47334c;
-  --atlas-paper: #e5e9de;
+  --atlas-paper: var(--atlas-water, #e5e9de);
   --atlas-on: #97452f;
   display: grid;
   grid-template-columns: minmax(14rem, 23%) minmax(0, 1fr) minmax(13.8rem, 22%);
@@ -99,11 +99,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   background: var(--atlas-paper);
   isolation: isolate;
 }
-.is-night .atlas-spread {
-  --atlas-ink: #f0ead3;
-  --atlas-muted: #c3c8ad;
+.is-dark .atlas-spread {
+  --atlas-ink: #fff9e9;
+  --atlas-muted: #e2e5d4;
   --atlas-line: #f0ead345;
-  --atlas-paper: #273c3a;
   --atlas-on: #f4bf94;
 }
 .atlas-map { grid-area: 1 / 1 / 2 / -1; margin: 0; min-width: 0; position: relative; }
@@ -219,9 +218,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .atlas-telemetry .policy-readout:hover { color: var(--atlas-ink); }
 .atlas-telemetry .policy-readout[aria-pressed="true"] { color: var(--atlas-ink); border-color: currentColor; background: transparent; }
 .policy-readout small { font: .65rem var(--mono); white-space: nowrap; }
-.is-night .policy-readout[data-policy="steady"] { --policy: #a4d6a9; }
-.is-night .policy-readout[data-policy="push"] { --policy: #e3a184; }
-.is-night .policy-readout[data-policy="reserve-first"] { --policy: #93bee0; }
+.is-dark .policy-readout[data-policy="steady"] { --policy: #a4d6a9; }
+.is-dark .policy-readout[data-policy="push"] { --policy: #e3a184; }
+.is-dark .policy-readout[data-policy="reserve-first"] { --policy: #93bee0; }
 .atlas-status { min-height: 4rem; padding: .62rem 0 .42rem; }
 .atlas-status .phase { font: 650 .7rem var(--mono); text-transform: uppercase; color: var(--atlas-on); }
 .atlas-status #race-place { color: var(--atlas-ink); font-size: .82rem; line-height: 1.4; margin-top: .24rem; }
