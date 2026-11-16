@@ -8,6 +8,8 @@ I adapted this lab from my Sunswift Racing race-strategy work. The supplied
 routes are synthetic. The SR7 preset uses public figures where available,
 and SR8 is a battery-and-solar scenario. [Vehicle inputs and example results](docs/sunswift-profiles.md)
 
+[BWSC simulation from installed C++](../../docs/bwsc-simulation.md)
+
 ## Run
 
 Run these commands from the ECM repository root. The lab is part of the

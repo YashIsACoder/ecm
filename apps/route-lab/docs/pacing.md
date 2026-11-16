@@ -15,28 +15,31 @@ For each leg, from finish to start:
 1. Set A[i] to max(R, D[i+1] − C[i+1]), where C is the nominal overnight
    solar credit before the next leg. Apply the credit only at a stage
    boundary and when the next departure target fits in the pack.
-2. Compute the smallest net draw E[i] across a grid of nine speeds and set
+2. Compute the smallest net draw E[i] across a grid of candidate speeds and set
    D[i] to max(R, A[i] + E[i]). At normal waypoints the nominal entry
    speed is the candidate speed. At starts, overnights and controls it is zero.
 
-The backward pass uses the selected ECM backend and a single dry planning
-scenario with 70% of clear-sky irradiance, 3 m/s headwind, and a 65%
-parked-solar factor. User weather adjustments apply to this scenario.
+The backward pass uses the selected ECM backend and a default dry planning
+forecast with 70% of clear-sky irradiance, 3 m/s headwind, and a 65%
+parked-solar factor. A caller can prepare a plan with a forecast per leg
+and set the speed grid size through `StrategyConfig`. Weather adjustments
+apply to that planning forecast and the observed simulations.
+[Prepared race API](../../../docs/bwsc-simulation.md)
 A target can exceed usable capacity. The trace exposes that infeasibility.
 
 ## Current-leg decision
 
 At departure, the controller uses the available state of charge, sampled
 conditions on that leg, and actual entry speed. It chooses the fastest of
-nine evenly spaced candidates whose capacity-clamped arrival charge meets
+the evenly spaced candidates whose capacity-clamped arrival charge meets
 A[i]. If none qualifies, it picks the candidate with the smallest net
 draw. This search evaluates grid candidates directly because regeneration,
 auxiliary draw and solar exposure can make net draw non-monotonic in speed.
 
 The controller shares an immutable O(L) envelope across the experiment.
-The setup costs O(LK) estimator calls, with L legs and at most K = 9 paces.
+The setup costs O(LK) estimator calls, with L legs and K candidate paces. The default grid uses nine samples.
 Each simulated envelope leg takes up to K calls and reuses the chosen energy
-estimate for the battery update. The heuristic uses a fixed reference
+estimate for the battery update. The heuristic uses the prepared reference
 forecast for future legs. Actual sampled rain and wind enter the decision
 when the car reaches the leg. It makes no claim of optimal travel time or
 confidence guarantees under real weather.

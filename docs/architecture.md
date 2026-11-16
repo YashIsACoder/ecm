@@ -2,7 +2,8 @@
 
 ECM computes energy from vehicle parameters and driving conditions. The route
 lab chooses speeds and updates battery state using that energy. Python consumes
-completed experiments as CSV and computes paired comparisons.
+completed experiments as CSV for reporting. Native consumers can compute
+paired statistics directly through `ECM::lab`.
 
 ```mermaid
 flowchart LR
@@ -33,7 +34,8 @@ flowchart LR
 
 `ECM::ecm_cont` links `ECM::ecm`. The bindings and the lab both use the
 library, so force and energy calculations live in one place. `ECM::lab`
-adds seeded weather and a streaming result sink on top of the estimators.
+adds prepared pacing plans, stage timing, seeded weather and streaming
+results on top of the estimators. [BWSC simulation from C++](bwsc-simulation.md)
 Native and wheel builds use the same CMake targets. Native installation
 exports the headers and CMake targets, and the wheel ships the extension
 plus package metadata.

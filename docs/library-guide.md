@@ -20,7 +20,7 @@ target_link_libraries(my_app PRIVATE ECM::ecm_cont)
 ```
 
 For a source checkout, `add_subdirectory` creates the same targets.
-The lab, tests and Python extension default off when embedded.
+The CLI, tests and Python extension default off when embedded. The C++ library targets remain available.
 Use `ECM::ecm` for the segment API alone.
 
 ```cpp
@@ -51,6 +51,9 @@ ecm::lab::run_experiment(route, config, {500, 2025}, [&](const ecm::lab::TrialRe
     steady_finishes += row.policy == ecm::lab::Policy::steady && row.result.completed;
 });
 ```
+
+For prepared plans, caller-supplied forecasts, BWSC timing and paired
+intervals, build the [standalone SR7 example](bwsc-simulation.md).
 
 ## Python
 

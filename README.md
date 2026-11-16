@@ -10,6 +10,7 @@ pacing and battery outcomes under the same simulated weather.
 | Segment | Cruise at a fixed speed with a lumped kinetic-energy change |
 | Drive cycle | Integrate explicit speed ramps and regenerative power limits |
 | Mapped cycle | Interpolate motoring efficiency using wheel speed and torque |
+| Gust-aware cycle | Average mapped energy across variable wind loads |
 
 ## Play the route lab
 
@@ -34,7 +35,7 @@ where available, and SR8 models a provisional battery-and-solar scenario.
 
 ## Use the library
 
-- **C++** exports `ECM::ecm` for the core, `ECM::ecm_cont` for drive cycles, and `ECM::lab` for routes, weather, strategy and experiments. [C++ integration and examples](docs/library-guide.md)
+- **C++** exports `ECM::ecm` for the core, `ECM::ecm_cont` for drive cycles, and `ECM::lab` for routes, weather, strategy and experiments. [C++ integration and examples](docs/library-guide.md) · [BWSC simulation walkthrough](docs/bwsc-simulation.md)
 - **Python** builds the same C++ targets via `python -m pip install .` and exposes them as `import ecm`. The extension supports Python 3.8 or later. [Python example](docs/library-guide.md#python)
 
 ## Design and validation
