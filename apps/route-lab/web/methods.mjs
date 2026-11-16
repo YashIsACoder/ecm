@@ -8,7 +8,7 @@ const features = {
   solar: { unit: "pp", scale: 100, description: "Offset to the clear-sky irradiance factor, in percentage points." },
   wind: { unit: "m/s", scale: 1, description: "Offset to signed route wind, in metres per second. Positive values increase headwind." },
 };
-const colors = ["#c9ef78", "#f1aa76", "#79c8dc", "#d0b7fb"];
+const colors = ["#26624d", "#a3412c", "#255d78", "#75527c"];
 let report;
 let feature = "solar";
 
@@ -39,17 +39,17 @@ function drawTrace() {
   ctx.font = "11px ui-monospace, monospace";
   for (const fraction of [0, .25, .5, .75, 1]) {
     const value = low + (high - low) * fraction;
-    ctx.fillStyle = "#afc2b4";
+    ctx.fillStyle = "#545f52";
     ctx.fillText((value * scale).toFixed(1), left - 8, y(value));
-    ctx.fillStyle = "#49655675";
+    ctx.fillStyle = "#adb7aa";
     ctx.fillRect(left, y(value), right - left, 1);
   }
   ctx.textAlign = "left";
-  ctx.fillStyle = "#afc2b4";
+  ctx.fillStyle = "#545f52";
   ctx.fillText("First retained", left, bottom + 15);
   ctx.textAlign = "right";
   ctx.fillText("Last plotted", right, bottom + 15);
-  ctx.strokeStyle = "#eef4edaa";
+  ctx.strokeStyle = "#23372a";
   ctx.setLineDash([5, 4]);
   ctx.beginPath();
   ctx.moveTo(left, y(exact_mean));
@@ -67,7 +67,7 @@ function drawTrace() {
     ctx.stroke();
   });
   ctx.globalAlpha = 1;
-  ctx.fillStyle = "#ffffff85";
+  ctx.fillStyle = "#915340";
   ctx.fillRect(x(index), top, 1, bottom - top);
   chains.forEach((chain, c) => {
     ctx.beginPath();

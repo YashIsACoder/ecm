@@ -18,7 +18,8 @@ def main() -> None:
             assert url.startswith("http://127.0.0.1:")
             with urlopen(url, timeout=5) as page:
                 dashboard = page.read().decode()
-                assert "Race control" in dashboard and "Experiment setup" in dashboard
+                assert "Route Lab" in dashboard and "Experiment setup" in dashboard
+                assert 'class="atlas-spread"' in dashboard and 'id="route-map"' in dashboard
                 assert "./analytics.html" in dashboard and 'id="reach"' not in dashboard
             with urlopen(url + "/analytics.html?trials=8", timeout=5) as page:
                 analytics = page.read().decode()

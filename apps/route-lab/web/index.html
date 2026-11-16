@@ -8,78 +8,64 @@
   <link rel="stylesheet" href="./race-control.css">
   <script src="./lab.mjs" type="module"></script>
 </head>
-<body>
+<body class="atlas-home">
   <header class="top">
-    <a class="brand" href="./"><span class="mark" aria-hidden="true"></span>ECM / SUNSWIFT ROUTE LAB</a>
-    <nav aria-label="Pages"><a href="./analytics.html" id="analytics-nav">Race outcomes</a><a href="./methods.html">Methods <span aria-hidden="true">↗</span></a></nav>
+    <a class="brand" href="./"><span class="mark" aria-hidden="true"></span>Sunswift Route Lab</a>
+    <nav aria-label="Pages">
+      <a href="./analytics.html" id="analytics-nav">Race outcomes</a>
+      <a href="./methods.html">Methods</a>
+      <details id="setup" class="atlas-setup">
+        <summary>Experiment setup</summary>
+        <div id="setup-host"><a href="./configure.html">Open setup</a></div>
+      </details>
+    </nav>
   </header>
   <main id="route-lab">
-    <div class="intro">
-      <div>
-        <h1>Sunswift Route Lab</h1>
-        <p id="race-spec">Compare three pacing strategies on the same weather draw.</p>
-      </div>
-    </div>
-    <details id="setup" class="inline-setup">
-      <summary>Experiment setup</summary>
-      <div id="setup-host"><a href="./configure.html">Open setup</a></div>
-    </details>
     <p id="run-feedback" class="run-feedback" role="status">Running experiment…</p>
-    <section class="replay" id="replay" aria-labelledby="replay-heading" hidden>
-      <div class="section-head">
-        <div>
-          <p class="readout" id="draw-label"></p>
-          <h2 id="replay-heading">Race control</h2>
-        </div>
-        <div class="run-actions">
-          <a href="./analytics.html" id="analytics-link" class="download">Race outcomes ↗</a>
-          <button type="button" id="save-scenario" class="download" disabled>Save run setup</button>
-          <button type="button" id="download-trace" class="download">Download trace</button>
-        </div>
-      </div>
-      <div class="timeline">
-        <div class="playback-buttons">
-          <button type="button" id="play" class="play">Play replay</button>
-          <button type="button" id="next-rest" class="download">Next REST</button>
-          <button type="button" id="next-charge" class="download" hidden>Next top-up</button>
-        </div>
-        <label for="leg" class="sr-only">Elapsed race time</label>
-        <input id="leg" type="range" min="0" max="0" step="any" value="0">
-        <output id="leg-label" for="leg"></output>
-      </div>
-      <div class="race-dashboard">
-        <figure class="map-card">
-          <div class="panel-heading">
-            <h3 id="route-map-heading">Route map</h3>
-            <div class="map-view" role="group" aria-label="Map camera">
-              <button type="button" data-camera="overview" aria-pressed="true">Overview</button>
-              <button type="button" data-camera="follow" aria-pressed="false">Follow car</button>
-            </div>
+    <section id="replay" aria-label="Race control" hidden>
+      <div class="atlas-spread">
+        <figure class="atlas-map">
+          <canvas id="route-map" role="img" aria-label="Atlas of the course and the three strategy cars. Their positions and battery levels are also listed in the telemetry."></canvas>
+          <div class="map-view" role="group" aria-label="Map camera">
+            <button type="button" data-camera="overview" aria-pressed="true">Overview</button>
+            <button type="button" data-camera="follow" aria-pressed="false">Follow car</button>
           </div>
-          <div class="map-frame">
-            <canvas id="route-map" role="img" aria-label="Animated Sunswift-style cars positioned along the simulated route. Each strategy’s distance and charge are shown alongside."></canvas>
-            <div class="map-clock"><span id="race-day"></span><strong id="race-clock"></strong><span>Race clock</span></div>
-            <div id="map-progress" class="map-progress"></div>
-            <div class="map-sky"><span class="sky-dot" aria-hidden="true"></span><span id="map-sky"></span></div>
-          </div>
+          <div class="map-sky"><span class="sky-dot" aria-hidden="true"></span><span id="map-sky"></span></div>
           <figcaption id="map-caption"></figcaption>
         </figure>
-        <div class="telemetry-rail">
-          <section class="telemetry" aria-label="Selected strategy telemetry">
-            <div class="telemetry-head"><strong id="active-policy"></strong><span id="race-phase" class="phase"></span></div>
+        <div class="atlas-intro">
+          <p id="race-spec"></p>
+          <h1 id="route-map-heading">Darwin<br>Adelaide</h1>
+          <div class="atlas-clock">
+            <span id="race-day"></span>
+            <strong id="race-clock"></strong>
+            <span id="map-progress"></span>
+          </div>
+        </div>
+        <section class="atlas-telemetry" aria-label="Selected strategy telemetry">
+          <div id="policy-readouts" class="policy-readouts" role="group" aria-label="Select a strategy to inspect"></div>
+          <div class="atlas-status">
+            <span id="active-policy" class="sr-only"></span>
+            <p id="race-phase" class="phase"></p>
             <p id="race-place"></p>
-            <dl class="pace-strip">
-              <div><dt>Leg average</dt><dd id="race-speed"></dd></div>
+          </div>
+          <div class="atlas-instruments">
+            <div>
+              <span id="race-speed-label">Leg speed</span>
+              <output id="race-speed" aria-labelledby="race-speed-label"></output>
+            </div>
+            <div>
+              <label for="selected-charge">Battery</label>
+              <output id="selected-charge-label" for="selected-charge"></output>
+              <meter id="selected-charge" min="0" max="100" low="15" optimum="85" value="95"></meter>
+            </div>
+          </div>
+          <p id="race-plan" hidden></p>
+          <details class="atlas-conditions">
+            <summary>Leg conditions</summary>
+            <dl>
               <div><dt>Cruise target</dt><dd id="race-target"></dd></div>
               <div><dt>Solar output</dt><dd id="race-output"></dd></div>
-            </dl>
-            <div class="charge-readout">
-              <label for="selected-charge">Battery charge</label>
-              <meter id="selected-charge" min="0" max="100" low="15" optimum="85" value="95"></meter>
-              <output id="selected-charge-label" for="selected-charge"></output>
-            </div>
-            <p id="race-plan" hidden></p>
-            <dl class="weather-strip">
               <div><dt>Irradiance</dt><dd id="race-solar"></dd></div>
               <div><dt>Cloud transmission</dt><dd id="race-cloud"></dd></div>
               <div><dt>Wind</dt><dd id="race-wind"></dd></div>
@@ -88,43 +74,60 @@
               <div><dt>Rain chance</dt><dd id="race-rain-chance"></dd></div>
               <div><dt>Effective pace cap</dt><dd id="race-cap"></dd></div>
             </dl>
-          </section>
-          <div id="policy-readouts" class="policy-readouts" aria-label="Select a strategy to inspect"></div>
-        </div>
+          </details>
+        </section>
       </div>
-      <div class="playback-deck">
+      <section class="atlas-transport" aria-label="Replay controls">
+        <div class="playback-buttons">
+          <button type="button" id="play" class="atlas-play"><span aria-hidden="true"></span><span class="sr-only">Play replay</span></button>
+          <button type="button" id="next-rest">Next REST</button>
+          <button type="button" id="next-charge" hidden>Next top-up</button>
+        </div>
+        <label for="leg" class="sr-only">Elapsed race time</label>
+        <input id="leg" type="range" min="0" max="0" step="any" value="0">
+        <output id="leg-label" for="leg"></output>
         <div class="replay-options">
-          <label for="replay-rate">Playback rate</label>
+          <label for="replay-rate" class="sr-only">Playback rate</label>
           <select id="replay-rate">
             <option value="0.5">0.5×</option><option value="1" selected>1×</option>
             <option value="2">2×</option><option value="4">4×</option>
           </select>
-          <label for="replay-clock-mode">Clock pacing</label>
+          <label for="replay-clock-mode" class="sr-only">Clock pacing</label>
           <select id="replay-clock-mode">
             <option value="highlights">Race highlights</option><option value="uniform">Uniform time scale</option>
           </select>
         </div>
-        <nav class="route-book" aria-label="Jump to a control stop">
-          <h3>Route book</h3>
-          <ol id="control-stops"></ol>
-        </nav>
-      </div>
-      <section class="energy-card" aria-labelledby="energy-heading">
-        <div class="panel-heading"><h3 id="energy-heading">Leg energy breakdown</h3><span id="energy-place"></span></div>
-        <div id="energy-breakdown"></div>
       </section>
-      <div class="log-head">
-        <h3>Native leg log</h3>
-        <label for="log-policy" class="sr-only">Log strategy</label>
-        <select id="log-policy" aria-label="Log strategy">
-          <option value="steady">Steady</option>
-          <option value="push">Push</option>
-          <option value="reserve-first" selected>Reserve-first</option>
-        </select>
-      </div>
-      <ol id="trace-log" class="trace-log"></ol>
+      <nav class="route-book" aria-label="Jump to a control stop">
+        <h2>Control stops</h2>
+        <ol id="control-stops"></ol>
+      </nav>
+      <details class="atlas-trace">
+        <summary>Energy breakdown and native log</summary>
+        <section aria-labelledby="energy-heading">
+          <div class="panel-heading"><h3 id="energy-heading">Leg energy</h3><span id="energy-place"></span></div>
+          <div id="energy-breakdown"></div>
+        </section>
+        <div class="log-head">
+          <h3>Native leg log</h3>
+          <label for="log-policy" class="sr-only">Log strategy</label>
+          <select id="log-policy" aria-label="Log strategy">
+            <option value="steady">Steady</option>
+            <option value="push">Push</option>
+            <option value="reserve-first" selected>Reserve-first</option>
+          </select>
+        </div>
+        <ol id="trace-log" class="trace-log"></ol>
+      </details>
+      <footer class="atlas-footer">
+        <p id="draw-label"></p>
+        <div class="run-actions">
+          <a href="./analytics.html" id="analytics-link">Analyse this replay point</a>
+          <button type="button" id="save-scenario" disabled>Save setup</button>
+          <button type="button" id="download-trace">Download trace</button>
+        </div>
+      </footer>
     </section>
-
   </main>
 </body>
 </html>

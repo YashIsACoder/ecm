@@ -1,9 +1,9 @@
 import { australia, routes } from "./map-data.mjs";
 
 export const policyStyles = {
-  steady: { color: "--teal", dash: [] },
-  push: { color: "--rust", dash: [7, 4] },
-  "reserve-first": { color: "--blue", dash: [2, 4] },
+  steady: { color: "--teal", paint: "#79ad87", dash: [] },
+  push: { color: "--rust", paint: "#df906f", dash: [7, 4] },
+  "reserve-first": { color: "--blue", paint: "#81aec5", dash: [2, 4] },
 };
 
 const interpolate = (start, end, ratio) => start + (end - start) * ratio;
@@ -118,7 +118,7 @@ function drawCar(ctx, x, y, angle, color, size, depleted, selected) {
   ctx.globalAlpha = depleted ? .58 : 1;
 
   if (selected) {
-    ctx.fillStyle = "#ecf8e924";
+    ctx.fillStyle = "#faf3d466";
     ctx.beginPath();
     ctx.arc(0, 0, 20, 0, Math.PI * 2);
     ctx.fill();
@@ -166,8 +166,8 @@ function drawCar(ctx, x, y, angle, color, size, depleted, selected) {
 
 function mapProjection(geographic, width, height) {
   if (!geographic) return ([x, y]) => [x * width, y * height];
-  const scale = Math.min((width - 34) / (42 * .89), (height - 25) / 33);
-  const centreX = width / 2 - scale * (width > 560 ? 3 : 0);
+  const scale = Math.min((width - 24) / (42 * .89), (height - 54) / 34);
+  const centreX = width * (width > 900 ? .51 : .50);
   return ([longitude, latitude]) => [
     centreX + (longitude - 133) * .89 * scale,
     height / 2 - (latitude + 27) * scale,
@@ -216,7 +216,7 @@ function drawWeather(ctx, centre, weather, night, hour) {
   ctx.ellipse(0, 0, radius * .77, radius * .58, 0, 0, Math.PI * 2);
   ctx.clip();
   const drops = Math.min(45, 11 + Math.round(rain * 3));
-  ctx.strokeStyle = "#cae1fd68";
+  ctx.strokeStyle = night ? "#cae1fd86" : "#406d905f";
   ctx.lineWidth = 1;
   ctx.beginPath();
   for (let drop = 0; drop < drops; drop += 1) {
@@ -230,10 +230,84 @@ function drawWeather(ctx, centre, weather, night, hour) {
   ctx.restore();
 }
 
+const atlasPalettes = {
+  day: {
+    water: "#e5e9de", landNorth: "#eddfb7", landSouth: "#dfd7ba", coast: "#7b8b75",
+    grid: "#4c695522", place: "#354437", halo: "#eee7cc", route: "#915139", travelled: "#a4422c",
+  },
+  night: {
+    water: "#273c3a", landNorth: "#475244", landSouth: "#394b43", coast: "#839b7b",
+    grid: "#dfe2b221", place: "#f1e9ca", halo: "#31443e", route: "#bd9c7d", travelled: "#ffc69c",
+  },
+};
+
+function drawAtlas(ctx, width, height, project, geographic, palette, overview) {
+  ctx.fillStyle = palette.water;
+  ctx.fillRect(0, 0, width, height);
+
+  if (!geographic) {
+    ctx.beginPath();
+    for (let tick = 20; tick < Math.max(width, height); tick += 30) {
+      ctx.moveTo(tick, 0);
+      ctx.lineTo(tick, height);
+      ctx.moveTo(0, tick);
+      ctx.lineTo(width, tick);
+    }
+    ctx.strokeStyle = palette.grid;
+    ctx.stroke();
+    return;
+  }
+
+  const land = ctx.createLinearGradient(0, 0, 0, height);
+  land.addColorStop(0, palette.landNorth);
+  land.addColorStop(1, palette.landSouth);
+  for (const polygon of australia) {
+    polyline(ctx, polygon.map(project));
+    ctx.closePath();
+    ctx.fillStyle = land;
+    ctx.fill();
+    ctx.strokeStyle = palette.coast;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  ctx.beginPath();
+  for (let longitude = 100; longitude <= 165; longitude += 5) {
+    ctx.moveTo(...project([longitude, -5]));
+    ctx.lineTo(...project([longitude, -48]));
+  }
+  for (let latitude = -10; latitude >= -45; latitude -= 5) {
+    ctx.moveTo(...project([100, latitude]));
+    ctx.lineTo(...project([165, latitude]));
+  }
+  ctx.strokeStyle = palette.grid;
+  ctx.stroke();
+
+  if (!overview || width < 620) return;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = "italic 11px Georgia, serif";
+  ctx.fillStyle = palette.place;
+  ctx.globalAlpha = .7;
+  ctx.fillText("Timor Sea", ...project([123, -12.5]));
+  ctx.fillText("Coral Sea", ...project([151, -17]));
+  ctx.fillText("Great Australian Bight", ...project([129, -34.7]));
+  ctx.font = "9px ui-monospace, monospace";
+  for (let longitude = 115; longitude <= 150; longitude += 5) {
+    const [x] = project([longitude, -10]);
+    ctx.fillText(`${longitude}° E`, x, 14);
+  }
+  ctx.font = "10px ui-monospace, monospace";
+  ctx.fillText("W E S T E R N", ...project([120.7, -24.7]));
+  ctx.fillText("A U S T R A L I A", ...project([120.7, -25.6]));
+  ctx.fillText("Q U E E N S L A N D", ...project([145.8, -24]));
+  ctx.globalAlpha = 1;
+}
+
 export function drawRouteMap(canvas, trace, positions, selected, night, hour = 0, camera = "overview") {
   const frame = prepare(canvas);
   if (!frame) return;
-  const { ctx, width, height, color } = frame;
+  const { ctx, width, height } = frame;
   const route = routes[trace.route];
   const overview = mapProjection(route.geographic, width, height);
   const kilometres = [0, ...trace.points.map((point) => point.km)];
@@ -245,62 +319,38 @@ export function drawRouteMap(canvas, trace, positions, selected, night, hour = 0
   } : overview;
   const points = route.points.map(project);
   const weather = active.event;
-  const rainy = (active.phase === "drive" || active.phase === "control") && weather.rain_mm_h > 0;
-  const sun = Math.max(0, Math.min(1, weather.irradiance_w_m2 / 1000));
-  const sky = ctx.createLinearGradient(0, 0, width, height);
-  sky.addColorStop(0, night ? "#11192c" : rainy ? "#24384d" : sun > .58 ? "#3b4226" : "#253837");
-  sky.addColorStop(1, night ? "#0b131b" : "#101e18");
-  ctx.fillStyle = sky;
-  ctx.fillRect(0, 0, width, height);
-  for (let x = 20; x < width; x += 25) {
-    for (let y = 20; y < height; y += 25) {
-      ctx.fillStyle = "#80a4912c";
-      ctx.fillRect(x, y, 1, 1);
-    }
-  }
-  if (route.geographic) {
-    for (const polygon of australia) {
-      polyline(ctx, polygon.map(project));
-      ctx.closePath();
-      ctx.fillStyle = night ? "#1b2932" : sun > .58 ? "#334334" : "#253b33";
-      ctx.fill();
-      ctx.strokeStyle = "#486755";
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    }
-  } else {
-    ctx.strokeStyle = "#49645345";
-    for (let ring = 1; ring <= 5; ring += 1) {
-      ctx.beginPath();
-      ctx.ellipse(width * .52, height * .49, width * .078 * ring, height * .088 * ring, -.24, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-  }
+  const palette = night ? atlasPalettes.night : atlasPalettes.day;
+  drawAtlas(ctx, width, height, project, route.geographic, palette, camera === "overview");
   if (active.phase === "drive" || active.phase === "control") {
     drawWeather(ctx, positionAt(points, kilometres, active.distance), weather, night, hour);
   }
   polyline(ctx, points);
-  ctx.strokeStyle = "#0c1913";
-  ctx.lineWidth = 7;
+  ctx.strokeStyle = palette.halo;
+  ctx.lineWidth = 4.5;
   ctx.stroke();
-  ctx.strokeStyle = "#b7d576a5";
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = palette.route;
+  ctx.lineWidth = 1.6;
   ctx.stroke();
 
   const traveled = points.filter((point, index) => kilometres[index] < active.distance);
   traveled.push(positionAt(points, kilometres, active.distance));
   polyline(ctx, traveled);
-  ctx.strokeStyle = color(policyStyles[selected].color);
-  ctx.lineWidth = 3;
+  ctx.strokeStyle = palette.travelled;
+  ctx.lineWidth = 2.8;
   ctx.stroke();
+
   for (const [index, [x, y]] of points.entries()) {
-    const control = trace.points[index - 1]?.control_minutes > 0;
+    const stop = index === 0 || index === points.length - 1 || trace.points[index - 1].control_minutes > 0;
+    if (!stop) continue;
     ctx.beginPath();
-    ctx.arc(x, y, control ? 4 : 2.1, 0, Math.PI * 2);
-    ctx.fillStyle = control ? "#ffd781" : "#ecf5d2";
+    ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = palette.halo;
     ctx.fill();
+    ctx.strokeStyle = palette.route;
+    ctx.lineWidth = 1.25;
+    ctx.stroke();
   }
-  ctx.font = "600 11px system-ui, sans-serif";
+  ctx.font = "600 12px Georgia, serif";
   ctx.textBaseline = "middle";
   const labels = camera === "follow"
     ? [...new Set([...route.labels, active.event.leg + 1])].sort((a, b) => a - b)
@@ -310,10 +360,10 @@ export function drawRouteMap(canvas, trace, positions, selected, night, hour = 0
     const label = point === 0 ? route.start : trace.points[point - 1].name;
     const left = index % 2 === 1 || x > width * .8;
     ctx.textAlign = left ? "right" : "left";
-    ctx.strokeStyle = "#111f17";
+    ctx.strokeStyle = palette.halo;
     ctx.lineWidth = 3;
     ctx.strokeText(label, x + (left ? -10 : 10), y + (point === 0 ? -8 : 0));
-    ctx.fillStyle = color("--ink");
+    ctx.fillStyle = palette.place;
     ctx.fillText(label, x + (left ? -10 : 10), y + (point === 0 ? -8 : 0));
   }
   const markers = Object.entries(positions).map(([policy, state], index) => {
@@ -321,7 +371,7 @@ export function drawRouteMap(canvas, trace, positions, selected, night, hour = 0
     const offset = (index - 1) * (width < 420 ? 18 : 22);
     const carX = x - Math.sin(angle) * offset;
     const carY = y + Math.cos(angle) * offset;
-    const paint = color(policyStyles[policy].color);
+    const paint = policyStyles[policy].paint;
     drawCar(ctx, carX, carY, angle, paint, width < 420 ? .78 : .9, state.depleted, policy === selected);
     return { x: carX, y: carY, paint, state };
   });
@@ -338,10 +388,9 @@ export function drawRouteMap(canvas, trace, positions, selected, night, hour = 0
     ctx.strokeStyle = paint;
     ctx.lineWidth = 1;
     ctx.stroke();
-    ctx.fillStyle = "#151c19";
+    ctx.fillStyle = "#27372e";
     ctx.fillRect(tagX - half, tagY - 7, half * 2, 14);
-    ctx.strokeRect(tagX - half, tagY - 7, half * 2, 14);
-    ctx.fillStyle = "#ffdd92";
+    ctx.fillStyle = "#fff2d1";
     ctx.fillText(label, tagX, tagY);
   }
 }

@@ -65,10 +65,20 @@ function resetReplay() {
   historyKey = undefined;
   const { draw, logs, route } = current.trace;
   const mapRoute = routes[route];
-  mapHeading.textContent = mapRoute.title;
+  const ends = mapRoute.title.split(" → ");
+  if (ends.length === 2) {
+    const to = document.createElement("span");
+    to.textContent = ends[1];
+    to.className = "atlas-destination";
+    mapHeading.replaceChildren(document.createTextNode(ends[0]), to);
+    mapHeading.setAttribute("aria-label", mapRoute.title);
+  } else {
+    mapHeading.textContent = mapRoute.title;
+    mapHeading.removeAttribute("aria-label");
+  }
   mapCaption.textContent = mapRoute.geographic
-    ? "Gold markers indicate control stops. Approximate route geometry. Coastline by Natural Earth."
-    : "Gold markers indicate control stops on this fictional route.";
+    ? "○ Control stop · Approximate course · Natural Earth coastline"
+    : "○ Control stop · Fictional route";
   const context = drawLabel.textContent;
   drawLabel.textContent = `Draw ${draw} · ${context}`;
   timeline = playbackTimeline(logs);
@@ -121,6 +131,7 @@ function renderReplay() {
   raceDay.textContent = `Day ${day}`;
   clockDisplay.textContent = clock;
   legLabel.textContent = `${hour.toFixed(1)} / ${horizon.toFixed(1)} h`;
+  leg.style.setProperty("--progress", `${horizon > 0 ? hour / horizon * 100 : 0}%`);
   leg.setAttribute("aria-valuetext", `Day ${day}, ${clock}. ${hour.toFixed(1)} race hours elapsed.`);
   const analytics = new URL(analyticsLinks[1].href);
   if (hour > 0) analytics.searchParams.set("at", hour.toFixed(6));
@@ -129,12 +140,12 @@ function renderReplay() {
   renderTelemetry(selected, positions[selected]);
   nextRest.disabled = nextControlHour() === undefined;
   nextCharge.disabled = nextChargeHour() === undefined;
+  replay.classList.toggle("is-night", night);
   for (const row of readouts.children) {
     const state = positions[row.dataset.policy];
     row.setAttribute("aria-pressed", String(row.dataset.policy === selected));
-    const charge = state.depleted ? "depleted" : `${state.soc.toFixed(0)}% SOC`;
-    const pace = state.phase === "drive" ? `${numbers.format(replaySpeed(state))} km/h` : phaseLabels[state.phase];
-    row.lastElementChild.textContent = `${numbers.format(state.distance)} km · ${charge} · ${pace}`;
+    const charge = state.depleted ? "Depleted" : `${state.soc.toFixed(0)}%`;
+    row.lastElementChild.textContent = `${numbers.format(state.distance)} km · ${charge}`;
   }
   const remaining = current.distances_km.at(-1) - positions[selected].distance;
   mapProgress.textContent = `${numbers.format(remaining)} km to finish`;
@@ -305,7 +316,8 @@ function renderEnergy(points, event) {
 function pauseReplay() {
   cancelAnimationFrame(timer);
   timer = undefined;
-  play.textContent = "Play replay";
+  play.classList.remove("is-playing");
+  play.lastElementChild.textContent = "Play replay";
 }
 
 function toggleReplay() {
@@ -320,7 +332,8 @@ function toggleReplay() {
   if (Number(leg.max) === 0) {
     return;
   }
-  play.textContent = "Pause replay";
+  play.classList.add("is-playing");
+  play.lastElementChild.textContent = "Pause replay";
   const start = performance.now();
   const schedule = clockMode.value === "uniform"
     ? [{ hour: 0, offset: 0 }, { hour: Number(leg.max), offset: Number(leg.max) }]
@@ -369,6 +382,12 @@ async function openSetup() {
 
 setup.addEventListener("toggle", openSetup);
 if (location.hash === "#setup") setup.open = true;
+setup.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && setup.open) {
+    setup.open = false;
+    setup.querySelector("summary").focus();
+  }
+});
 
 async function runExperiment() {
   try {
@@ -378,7 +397,9 @@ async function runExperiment() {
     nextCharge.hidden = !cruiser;
     if (cruiser) {
       const pack = settings.pack_kwh === null ? "55 MJ pack (15.28 kWh)" : `${settings.pack_kwh} kWh pack`;
-      raceSpec.textContent = `2025 Cruiser · ${pack} · Overnight charging`;
+      raceSpec.textContent = `SR7 · 2025 Cruiser · ${pack}`;
+    } else {
+      raceSpec.textContent = settings.vehicle === "reference" ? "Reference solar car" : settings.vehicle.toUpperCase();
     }
     scenario = { version: 1, settings, ...data.reproduce };
     analyticsLinks.forEach((link) => {
