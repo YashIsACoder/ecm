@@ -5,7 +5,21 @@ The rival masses, drag areas, rolling coefficients, auxiliaries, arrays and
 pace ceilings are illustrative inputs. The comparison is a controlled
 simulation, with no design score, start offsets, crew strategy data or
 historical weather reconstruction. The fixture's waypoints and distances
-approximate the Darwin–Adelaide corridor.
+approximate the Darwin–Adelaide corridor. The fleet report reconciles leg
+distances to the published 1,209.8 km Barrow Creek, 2,717.6 km Port Augusta
+and 3,021.5 km Adelaide controls. Distances are scaled proportionally
+between these anchors.
+
+## 2025 checkpoint replay
+
+Live Race reads the static [archive](../web/bwsc-2025.json). Its final control
+arrivals and event-hour values come from the [organiser's results](https://worldsolarchallenge.org/final-results)
+and [final classification](https://assets.worldsolarchallenge.org/app/uploads/2026/05/06130917/2025-BWSC-Results.pdf).
+An [earlier timing snapshot](https://www.electricmotornews.com/gb/motorsports/brunel-word-solar-challenge/)
+adds six provisional checkpoint arrivals. All timestamps use ACST.
+The replay steps through recorded events. Markers stay at the latest
+published checkpoint, and teams without any logged arrival remain unplaced.
+The archive contains no interpolated speed, position, battery or weather.
 
 ## C++ fleet API
 
@@ -22,7 +36,7 @@ has its own speed, depletion, controls, overnight recharge and stage timing.
 
 int main() {
     using namespace ecm::lab;
-    auto route = default_route();
+    auto route = bwsc_2025_cruiser_route();
     auto field = bwsc_2025_cruiser_profiles();
     std::vector<FleetEntry> entries;
     for (const auto& profile : field) entries.push_back(profile.entry);
@@ -37,8 +51,12 @@ int main() {
 Use a `FleetTrace` to stream leg observations for one trial. The browser's
 native report publishes Wilson intervals on finish rates, paired Newcombe
 intervals against Sunswift, and median elapsed race time among finishers.
-`--atlas-report` uses the built-in corridor and the five presets. It accepts
+`--atlas-report` uses the distance-anchored corridor and the five presets. It accepts
 the common model, gust, weather, seed, trial count and trace draw options.
+`--atlas-custom` adds a sixth entry. Vehicle flags include `--mass-kg`,
+`--drag-area-m2`, `--rolling-coefficient`, `--auxiliary-w`,
+`--custom-pace-kmh`, `--array-m2`, `--cell-efficiency-pct` and
+`--pack-kwh`. The same Cruiser storage constraint applies.
 For a custom fleet or route, use `run_fleet` directly.
 
 ## Solar position and relief

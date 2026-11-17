@@ -1,6 +1,7 @@
 import { carColors, drawCruiserAtlas, geographicPosition, loadTerrain, sunAt } from "./atlas-map.mjs";
-import { fleetRows, loadFleet } from "./fleet-data.mjs";
+import { fillFleetComparison, fleetRows, loadFleet } from "./fleet-data.mjs";
 import { checkpointHour, playbackTimeline, raceClock, replaySpeed, routeBook, skyCondition, traceAt, translateTime } from "./replay.mjs";
+import { downloadFile } from "./run-data.mjs";
 import { defaultSettings } from "./scenario.mjs";
 
 const $ = (id) => document.getElementById(id);
@@ -12,8 +13,12 @@ const status = $("atlas-status");
 const camera = $("map-camera");
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const query = new URLSearchParams(location.search);
-const live = query.get("view") === "race";
 const number = new Intl.NumberFormat("en-AU", { maximumFractionDigits: 0 });
+const distanceNumber = new Intl.NumberFormat("en-AU", { maximumFractionDigits: 1 });
+const form = $("fleet-form");
+const runButton = $("run");
+const fleetFeedback = $("fleet-feedback");
+const custom = $("fleet-car");
 let report;
 let kilometres;
 let stops;
@@ -188,38 +193,100 @@ function makeStops() {
   }));
 }
 
-async function start() {
-  if (Object.keys(defaultSettings).some((field) => query.has(field)) || location.hash === "#setup") {
-    location.replace(`./experiment.html${location.search}${location.hash}`);
-    return;
-  }
-  const fleet = await loadFleet();
+function showFleet(fleet, startHour, description) {
+  pause();
+  rows.clear();
+  order = "";
+  motion = 0;
+  $("standings").replaceChildren();
+  if (!fleet.teams.some(({ id }) => id === selected)) selected = "sunswift";
   const { points } = fleet;
   kilometres = [0, ...points.map(({ km }) => km)];
   stops = routeBook(points, "Darwin");
   report = fleet;
   timeline = playbackTimeline(Object.fromEntries(fleet.teams.map(({ id, legs }) => [id, legs])));
   slider.max = fleet.horizon_hours;
-  slider.value = live ? 0 : Math.min(54, fleet.horizon_hours);
+  slider.value = Math.min(startHour, fleet.horizon_hours);
   slider.disabled = false;
   play.disabled = false;
-  $("route-distance").textContent = `${number.format(kilometres.at(-1))} km`;
+  $("route-distance").textContent = `${distanceNumber.format(kilometres.at(-1))} km`;
   $("route-stops").textContent = String(stops.length - 2);
-  status.textContent = `Simulated positions · draw ${fleet.draw} · seed ${fleet.seed}`;
+  status.textContent = `${description} · draw ${fleet.draw} · seed ${fleet.seed}`;
   makeRows(fleet.teams);
   makeStops();
-  loadTerrain().then((image) => {
-    terrain = image;
-    render();
-  });
+  fillFleetComparison($("current-fleet-results"), $("current-fleet-run"), fleet);
+  $("fleet-download").disabled = false;
   render();
-  if (live) {
-    document.querySelector("nav [aria-current]").removeAttribute("aria-current");
-    document.querySelector('nav a[href="./?view=race"]').setAttribute("aria-current", "page");
-    if (!reducedMotion.matches) toggle();
-  }
 }
 
+async function start() {
+  if (query.get("view") === "race") {
+    location.replace("./race.html");
+    return;
+  }
+  if (Object.keys(defaultSettings).some((field) => query.has(field)) || location.hash === "#setup") {
+    location.replace(`./experiment.html${location.search}${location.hash}`);
+    return;
+  }
+  const [fleet, image] = await Promise.all([loadFleet(), loadTerrain()]);
+  terrain = image;
+  showFleet(fleet, 54, "Reference simulation");
+}
+
+function requestSettings() {
+  const values = new FormData(form);
+  const request = {
+    model: values.get("model"), weather: values.get("weather"), seed: values.get("seed"),
+    trials: Number(values.get("trials")), draw: Number(values.get("draw")),
+    rain_multiplier: Number(values.get("rain_multiplier")),
+  };
+  if (values.has("gust_sd_mps")) request.gust_sd_mps = Number(values.get("gust_sd_mps"));
+  if (!custom.disabled) {
+    request.custom = Object.fromEntries([...custom.querySelectorAll("input")]
+      .filter((field) => field.value !== "").map((field) => [field.name, Number(field.value)]));
+  }
+  return request;
+}
+
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (runButton.disabled) return;
+  runButton.disabled = true;
+  fleetFeedback.textContent = "Running the native C++ fleet…";
+  try {
+    const response = await fetch("./api/fleet", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(requestSettings()),
+    });
+    if ([404, 405, 501].includes(response.status)) {
+      throw new Error("Start the local ECM server to run a new fleet simulation. The reference run remains available here.");
+    }
+    const fleet = await response.json();
+    if (!response.ok) throw new Error(fleet.error || "The simulation failed.");
+    showFleet(fleet, 0, "Fleet simulation");
+    $("fleet-comparison").open = true;
+    fleetFeedback.textContent = `Finished ${fleet.trials} matched draws. The map shows draw ${fleet.draw}.`;
+  } catch (error) {
+    fleetFeedback.textContent = error.message;
+  } finally {
+    runButton.disabled = false;
+  }
+});
+$("configure-fleet").addEventListener("click", () => { $("fleet-config").open = true; });
+if (location.hash === "#fleet-config") $("fleet-config").open = true;
+$("fleet-add-car").addEventListener("change", (event) => {
+  custom.disabled = custom.hidden = !event.target.checked;
+});
+$("fleet-model").addEventListener("change", (event) => {
+  $("fleet-gust").disabled = $("fleet-gust-settings").hidden = event.target.value !== "gust";
+});
+$("fleet-trials").addEventListener("input", (event) => {
+  const draw = $("fleet-draw");
+  draw.max = event.target.value;
+  if (event.target.valueAsNumber > 0 && draw.valueAsNumber > event.target.valueAsNumber) draw.value = draw.max;
+});
+$("fleet-download").addEventListener("click", () => {
+  if (report) downloadFile(JSON.stringify(report, null, 2) + "\n", `fleet-${report.seed}.json`, "application/json");
+});
 play.addEventListener("click", toggle);
 slider.addEventListener("input", () => {
   pause();
@@ -238,4 +305,4 @@ camera.addEventListener("click", () => {
 });
 reducedMotion.addEventListener("change", render);
 new ResizeObserver(render).observe(canvas);
-start().catch((error) => { status.textContent = error.message; });
+start().catch((error) => { status.textContent = error.message; }).finally(() => { runButton.disabled = false; });

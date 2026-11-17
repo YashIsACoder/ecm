@@ -22,10 +22,15 @@ ctest --test-dir build --output-on-failure
 python3 apps/route-lab/serve.py build/bin/solar-race
 ```
 
-Open `http://127.0.0.1:8765` for the Cruiser atlas. **Live Race** plays the
-five-car replay from Darwin. Select a car in the standings to inspect its
-weather and solar position. **Teams** shows the scenario inputs, and **Data**
-compares finish rates from matched draws.
+Open `http://127.0.0.1:8765` for the Cruiser atlas. **Route Atlas**
+starts with a reference simulation. Open **Configure fleet** to choose
+an ECM variant, weather, seed and draw count, and optionally add a custom
+Cruiser. The map and comparison table use the selected run. **Teams** and
+**Data** show the bundled presets and reference comparison.
+
+**Live Race** plays published 2025 Cruiser checkpoint records on the same
+map. Markers show each car's latest recorded checkpoint. Time advances
+from one logged event to the next. See [archival sources](docs/cruiser-atlas.md#2025-checkpoint-replay).
 
 Open **Experiment setup** to choose the route, ECM variant, battery, speed
 targets, solar array, and weather stressors for a strategy run.
@@ -67,7 +72,8 @@ See the [forecast model](docs/forecast.md) for MCMC and rain, and the
 
 Copy the contents of [`web/`](web/) into a static site directory. The index
 loads the native five-car fleet report and local terrain sprite, without a
-backend or a map token. Link to `experiment.html?replay=1` for the recorded
+backend or a map token. The historical checkpoint replay is also static.
+Link to `experiment.html?replay=1` for the recorded
 Sunswift pacing comparison. New strategy experiments use the local lab.
 To regenerate the recorded data after rebuilding, run
 

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>2025 BWSC replay · SolarRoute Studio</title>
+  <link rel="stylesheet" href="./atlas.css">
+  <script src="./race.mjs" type="module"></script>
+</head>
+<body>
+  <header class="atlas-header">
+    <a class="atlas-brand" href="./">SolarRoute Studio</a>
+    <nav aria-label="Pages">
+      <a href="./">Route Atlas</a>
+      <a href="./race.html" aria-current="page">Live Race</a>
+      <a href="./teams.html">Teams</a>
+      <a href="./data.html">Data</a>
+      <a href="./about.html">About</a>
+    </nav>
+    <output class="atlas-clock" id="record-clock" aria-label="Race time"></output>
+  </header>
+  <main class="atlas-content">
+    <div class="atlas-sheet">
+      <aside class="atlas-sidebar archive-sidebar">
+        <p class="atlas-overline">24–29 August 2025</p>
+        <h1>2025 BWSC<br>Cruiser replay</h1>
+        <p class="atlas-note">Markers show the most recent published checkpoint. Gaps in the timing record are left open.</p>
+        <section class="atlas-rank" aria-labelledby="archive-heading">
+          <h2 id="archive-heading">Checkpoint record</h2>
+          <div class="atlas-table-wrap">
+            <table>
+              <thead><tr><th scope="col">No.</th><th scope="col">Car</th><th scope="col">Last logged</th><th scope="col">Time</th></tr></thead>
+              <tbody id="record-rows"></tbody>
+            </table>
+          </div>
+          <p class="atlas-note" id="record-status" role="status">Loading race records…</p>
+          <p class="atlas-note" id="record-detail"></p>
+        </section>
+        <div class="atlas-bottom"><a href="https://worldsolarchallenge.org/final-results">Official final results</a></div>
+      </aside>
+      <figure class="atlas-figure">
+        <canvas id="record-map" role="img" aria-label="Map of the logged 2025 Cruiser checkpoint arrivals"></canvas>
+        <figcaption><output>Last recorded checkpoint</output></figcaption>
+      </figure>
+    </div>
+    <section class="atlas-replay archive-replay" aria-label="Historical race playback">
+      <div class="atlas-controls">
+        <button id="record-play" class="atlas-play" type="button" aria-label="Play recorded checkpoints" disabled><span aria-hidden="true"></span></button>
+      </div>
+      <div class="atlas-seek">
+        <label class="sr-only" for="record-time">Checkpoint event</label>
+        <input id="record-time" class="atlas-range" type="range" min="0" max="0" value="0" step="1" disabled>
+        <ol id="record-days" class="atlas-stops" aria-label="Jump to recorded date"></ol>
+      </div>
+    </section>
+    <div class="atlas-article">
+      <h2>Race log</h2>
+      <div class="atlas-table-wrap">
+        <table>
+          <thead><tr><th scope="col">Time (ACST)</th><th scope="col">Car</th><th scope="col">Checkpoint</th><th scope="col">Status</th><th scope="col">Source</th></tr></thead>
+          <tbody id="record-log"></tbody>
+        </table>
+      </div>
+      <p>See the <a href="https://assets.worldsolarchallenge.org/app/uploads/2026/05/06130917/2025-BWSC-Results.pdf">official classification</a> for standings and event times. The Route Atlas runs a separate ECM scenario.</p>
+    </div>
+  </main>
+</body>
+</html>

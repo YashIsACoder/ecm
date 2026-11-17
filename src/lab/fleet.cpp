@@ -1,6 +1,33 @@
 #include "ecm/fleet.hpp"
 
+#include <stdexcept>
+#include <utility>
+
 namespace ecm::lab {
+
+std::vector<Leg> bwsc_2025_cruiser_route() {
+    constexpr std::pair<std::string_view, double> anchors[]{
+        {"Barrow Creek", 1209.8}, {"Port Augusta", 2717.6}, {"Adelaide", 3021.5},
+    };
+    auto route = default_route();
+    std::size_t start = 0;
+    double prior = 0.0;
+    for (const auto& [destination, km] : anchors) {
+        std::size_t end = start;
+        double original = 0.0;
+        while (end < route.size() && route[end].destination != destination) {
+            original += route[end].distance_km;
+            ++end;
+        }
+        if (end == route.size()) throw std::logic_error("missing 2025 distance anchor");
+        original += route[end].distance_km;
+        ++end;
+        const double scale = (km - prior) / original;
+        for (; start < end; ++start) route[start].distance_km *= scale;
+        prior = km;
+    }
+    return route;
+}
 
 std::vector<CruiserProfile> bwsc_2025_cruiser_profiles() {
     auto sunswift = vehicle_config("sr7");

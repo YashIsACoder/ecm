@@ -19,7 +19,17 @@ def main() -> None:
             with urlopen(url, timeout=5) as page:
                 atlas = page.read().decode()
                 assert "SolarRoute Studio" in atlas and 'id="standings"' in atlas
-                assert all(link in atlas for link in ("?view=race", "./teams.html", "./data.html", "./about.html"))
+                assert all(link in atlas for link in ("./race.html", "./teams.html", "./data.html", "./about.html"))
+                assert 'id="fleet-form"' in atlas
+            with urlopen(url + "/race.html", timeout=5) as page:
+                assert 'id="record-log"' in page.read().decode()
+            with urlopen(url + "/bwsc-2025.json", timeout=5) as response:
+                archive = json.load(response)
+                assert len(archive["teams"]) == 8
+                result = [row for row in archive["events"] if row["id"] == "sunswift"][-1]
+                assert result["at"] == "2025-08-29T12:30:38+09:30" and result["source"] == "final"
+                assert archive["stops"][result["stop"]]["name"] == "Port Augusta"
+                assert sum(row["status"] == "Finished" for row in archive["events"]) == 3
             with urlopen(url + "/experiment.html", timeout=5) as page:
                 dashboard = page.read().decode()
                 assert "SolarRoute Studio" in dashboard and "Experiment setup" in dashboard
@@ -44,7 +54,7 @@ def main() -> None:
                 with urlopen(url + "/" + page, timeout=5) as content:
                     document = content.read().decode()
                     assert 'href="./atlas.css"' in document and 'class="atlas-header"' in document
-                    assert all(link in document for link in ("?view=race", "./teams.html", "./data.html", "./about.html"))
+                    assert all(link in document for link in ("./race.html", "./teams.html", "./data.html", "./about.html"))
                     assert 'aria-label="Experiment"' in document
             with urlopen(url + "/analytics.html?trials=8", timeout=5) as page:
                 analytics = page.read().decode()
@@ -77,6 +87,26 @@ def main() -> None:
                 assert len(forecast["features"]["solar"]["chains"]) == 4
             with urlopen(url + "/replay.mjs", timeout=5) as asset:
                 assert asset.headers.get_content_type() == "text/javascript"
+
+            fleet_settings = {"model": "gust", "weather": "baseline", "seed": "42", "trials": 3, "draw": 2,
+                              "rain_multiplier": 0, "custom": {"mass_kg": 575, "drag_area_m2": .12,
+                              "pack_kwh": 11.5, "custom_pace_kmh": 79}}
+            def post_fleet(settings):
+                return urlopen(Request(url + "/api/fleet", json.dumps(settings).encode(),
+                                       {"Content-Type": "application/json"}), timeout=10)
+            with post_fleet(fleet_settings) as response:
+                simulation = json.load(response)
+            assert simulation["model"] == "gust" and simulation["trials"] == 3 and simulation["draw"] == 2
+            assert simulation["points"][-1]["km"] == 3021.5
+            custom = simulation["teams"][-1]
+            assert custom["id"] == "custom" and custom["mass_kg"] == 575 and custom["pack_kwh"] == 11.5
+            assert custom["drag_area_m2"] == .12 and custom["pace_ceiling_kmh"] == 79
+            assert custom["legs"][0]["demand_wh"] != simulation["teams"][0]["legs"][0]["demand_wh"]
+            try:
+                with post_fleet(fleet_settings | {"custom": {"pack_kwh": 38}}):
+                    raise AssertionError("Fleet accepted storage beyond the 2025 Cruiser limit")
+            except HTTPError as error:
+                assert error.code == 400
 
             request = {"route": "rolling", "vehicle": "sr8", "model": "mapped",
                        "trials": 8, "seed": "42", "trace_trial": 3, "weather": "posterior", "rain_multiplier": 0}

@@ -32,6 +32,9 @@ ASSETS = {
     "/atlas-map.mjs": ("atlas-map.mjs", "text/javascript; charset=utf-8"),
     "/atlas-demo.json": ("atlas-demo.json", "application/json"),
     "/atlas-relief.webp": ("atlas-relief.webp", "image/webp"),
+    "/race.html": ("race.html", "text/html; charset=utf-8"),
+    "/race.mjs": ("race.mjs", "text/javascript; charset=utf-8"),
+    "/bwsc-2025.json": ("bwsc-2025.json", "application/json"),
     "/experiment.html": ("experiment.html", "text/html; charset=utf-8"),
     "/fleet-data.mjs": ("fleet-data.mjs", "text/javascript; charset=utf-8"),
     "/fleet-pages.mjs": ("fleet-pages.mjs", "text/javascript; charset=utf-8"),
@@ -75,6 +78,39 @@ def bounded_number(value, label, minimum, maximum):
     if type(value) not in (int, float) or not minimum <= value <= maximum:
         raise ValueError(f"{label} must be from {minimum:g} to {maximum:g}.")
     return value
+
+
+def atlas_arguments(request: dict) -> list[str]:
+    if not isinstance(request, dict):
+        raise ValueError("Expected fleet simulation settings as an object.")
+    model, weather = request.get("model"), request.get("weather")
+    if model not in ("segment", "cycle", "mapped", "gust") or weather not in ("baseline", "posterior"):
+        raise ValueError("Choose a supported ECM and weather model.")
+    trials, draw, seed = request.get("trials"), request.get("draw"), request.get("seed")
+    if type(trials) is not int or not 1 <= trials <= 500:
+        raise ValueError("Fleet trial count must be an integer from 1 to 500.")
+    if type(draw) is not int or not 1 <= draw <= trials:
+        raise ValueError("Choose a replay draw between 1 and the trial count.")
+    if not isinstance(seed, str) or not re.fullmatch(r"[0-9]{1,20}", seed) or int(seed) >= 2**64:
+        raise ValueError("Seed must be a nonnegative 64-bit integer.")
+    rain = bounded_number(request.get("rain_multiplier", 1), "Rain exposure", 0, 8)
+    gust = bounded_number(request.get("gust_sd_mps", 2), "Gust spread", 0, 15)
+    args = ["--atlas-report", "--model", model, "--weather", weather, "--trials", str(trials),
+            "--trace-trial", str(draw), "--seed", seed, "--rain-multiplier", str(rain), "--gust-sd-mps", str(gust)]
+    custom = request.get("custom")
+    if custom is not None:
+        limits = {
+            "mass_kg": ("Race mass", 120, 2000), "drag_area_m2": ("Drag area", .03, 1.5),
+            "rolling_coefficient": ("Rolling coefficient", .001, .03), "auxiliary_w": ("Auxiliary load", 0, 1500),
+            "custom_pace_kmh": ("Pace ceiling", 20, 130), "array_m2": ("Array area", 0, 30),
+            "cell_efficiency_pct": ("Cell efficiency", .01, 100), "pack_kwh": ("Pack capacity", .001, CRUISER_MAX_KWH),
+        }
+        if not isinstance(custom, dict) or custom.keys() - limits.keys():
+            raise ValueError("Invalid custom vehicle fields.")
+        args.append("--atlas-custom")
+        for key, value in custom.items():
+            args.extend(["--" + key.replace("_", "-"), str(bounded_number(value, *limits[key]))])
+    return args
 
 
 def experiment_arguments(request: dict) -> tuple[list[str], Path, int]:
@@ -267,7 +303,7 @@ def handler_for(executable: Path):
 
         def do_POST(self):
             host = self.expected_host()
-            if self.headers.get("Host") != host or self.path != "/api/run":
+            if self.headers.get("Host") != host or self.path not in ("/api/run", "/api/fleet"):
                 self.send_error(HTTPStatus.NOT_FOUND)
                 return
             if self.headers.get("Origin") not in (None, f"http://{host}"):
@@ -278,7 +314,9 @@ def handler_for(executable: Path):
                 if self.headers.get_content_type() != "application/json" or not 0 < size <= 2048:
                     raise ValueError("Expected a small JSON request.")
                 request = json.loads(self.rfile.read(size))
-                experiment_arguments(request)
+                fleet_args = atlas_arguments(request) if self.path == "/api/fleet" else None
+                if fleet_args is None:
+                    experiment_arguments(request)
             except (ValueError, OverflowError) as error:
                 self.json_response(HTTPStatus.BAD_REQUEST, {"error": str(error)})
                 return
@@ -286,7 +324,12 @@ def handler_for(executable: Path):
                 self.json_response(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "The lab is busy. Try again shortly."})
                 return
             try:
-                result = run_case(executable, request)
+                if fleet_args is None:
+                    result = run_case(executable, request)
+                else:
+                    native = subprocess.run([executable, *fleet_args], capture_output=True, text=True,
+                                            check=True, timeout=15)
+                    result = json.loads(native.stdout)
             except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
                 self.log_error("Simulation failed: %s", error)
                 self.json_response(HTTPStatus.BAD_GATEWAY, {"error": "The native simulation could not finish."})

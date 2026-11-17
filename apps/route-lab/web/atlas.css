@@ -155,3 +155,16 @@ th, td { border-bottom: 1px solid var(--rule); padding: .29rem .11rem; }
   .atlas-replay { grid-template-columns: auto minmax(0, 1fr); column-gap: .6rem; }
   #atlas-duration { display: none; }
 }
+
+.archive-sidebar h1 { font-size: clamp(2.25rem, 3.5vw, 4.65rem); }
+.archive-replay { grid-template-columns: auto minmax(0, 1fr); }
+.record-jump { color: inherit; background: none; border: 0; padding: 0; text-decoration: underline; text-underline-offset: .22em; }
+.atlas-fleet-tools { margin-top: 1rem; }
+.atlas-fleet-tools form { margin-top: 1rem; }
+.fleet-toggle { display: flex; align-items: center; gap: .35rem; }
+.fleet-toggle input { width: auto; min-height: 0; margin: 0; accent-color: var(--green); }
+.fleet-specs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: .15rem 1rem; }
+@media (max-width: 760px) {
+  .archive-sidebar { display: block; }
+  .archive-sidebar .atlas-rank { margin-top: .6rem; }
+}

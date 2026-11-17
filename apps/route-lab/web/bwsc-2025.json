@@ -1,0 +1,48 @@
+{
+  "start": "2025-08-24T08:00:00+09:30",
+  "sources": {
+    "final": "https://worldsolarchallenge.org/final-results",
+    "classification": "https://assets.worldsolarchallenge.org/app/uploads/2026/05/06130917/2025-BWSC-Results.pdf",
+    "snapshot": "https://www.electricmotornews.com/gb/motorsports/brunel-word-solar-challenge/",
+    "route": "https://assets.worldsolarchallenge.org/app/uploads/2025/08/04131233/BWSC-2025-Official-Program-v5.pdf"
+  },
+  "stops": [
+    {"name":"Darwin","waypoint":0,"km":0},
+    {"name":"Katherine","waypoint":4},
+    {"name":"Dunmarra","waypoint":8},
+    {"name":"Tennant Creek","waypoint":12},
+    {"name":"Barrow Creek","waypoint":14,"km":1209.8},
+    {"name":"Alice Springs","waypoint":17},
+    {"name":"Erldunda","waypoint":19},
+    {"name":"Coober Pedy","waypoint":23},
+    {"name":"Glendambo","waypoint":24},
+    {"name":"Port Augusta","waypoint":26,"km":2717.6},
+    {"name":"Adelaide","waypoint":28,"km":3021.5}
+  ],
+  "teams": [
+    {"id":"vtc","number":25,"car":"Sophie 8X","team":"VTC Solar Car Team","rank":1,"event_hours":44.00},
+    {"id":"solaride","number":66,"car":"Solaride III Enefit","team":"Solaride","rank":2,"event_hours":44.07},
+    {"id":"onda","number":59,"car":"Emilia 5.9","team":"Onda Solare","rank":3,"event_hours":47.02},
+    {"id":"apollo","number":95,"car":"Apollo IX Plus","team":"Apollo Solar Car Team","rank":4,"event_hours":44.68},
+    {"id":"dust","number":67,"car":"DUST","team":"Deakin University Solar Team","rank":5,"event_hours":44.94},
+    {"id":"sunswift","number":11,"car":"Sunswift 7","team":"Sunswift Racing","rank":6,"event_hours":45.51},
+    {"id":"gaia","number":35,"car":"Gaia","team":"University of Minnesota Solar Vehicle Project","rank":7,"event_hours":23.18},
+    {"id":"archimede","number":24,"car":"Thalia","team":"Archimede","rank":null,"event_hours":null}
+  ],
+  "events": [
+    {"id":"archimede","stop":0,"at":"2025-08-24T08:00:00+09:30","source":"final","status":"Did not start"},
+    {"id":"gaia","stop":4,"at":"2025-08-26T14:40:52+09:30","source":"final","status":"Final recorded control"},
+    {"id":"onda","stop":8,"at":"2025-08-28T12:31:34+09:30","source":"snapshot","status":"Checkpoint logged"},
+    {"id":"apollo","stop":8,"at":"2025-08-28T14:03:48+09:30","source":"snapshot","status":"Checkpoint logged"},
+    {"id":"vtc","stop":9,"at":"2025-08-28T15:02:28+09:30","source":"snapshot","status":"Checkpoint logged"},
+    {"id":"solaride","stop":9,"at":"2025-08-28T15:22:08+09:30","source":"snapshot","status":"Checkpoint logged"},
+    {"id":"dust","stop":8,"at":"2025-08-28T15:22:17+09:30","source":"snapshot","status":"Checkpoint logged"},
+    {"id":"sunswift","stop":8,"at":"2025-08-28T15:44:37+09:30","source":"snapshot","status":"Checkpoint logged"},
+    {"id":"vtc","stop":10,"at":"2025-08-29T11:29:56+09:30","source":"final","status":"Finished"},
+    {"id":"solaride","stop":10,"at":"2025-08-29T11:34:00+09:30","source":"final","status":"Finished"},
+    {"id":"apollo","stop":9,"at":"2025-08-29T11:40:35+09:30","source":"final","status":"Final recorded control"},
+    {"id":"dust","stop":9,"at":"2025-08-29T11:56:36+09:30","source":"final","status":"Final recorded control"},
+    {"id":"sunswift","stop":9,"at":"2025-08-29T12:30:38+09:30","source":"final","status":"Final recorded control"},
+    {"id":"onda","stop":10,"at":"2025-08-29T14:31:05+09:30","source":"final","status":"Finished"}
+  ]
+}

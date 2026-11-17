@@ -39,4 +39,8 @@ struct CruiserProfile {
 // scenarios under the same modeled Cruiser energy and timing constraints.
 [[nodiscard]] std::vector<CruiserProfile> bwsc_2025_cruiser_profiles();
 
+// The built-in corridor with leg distances reconciled to published 2025 control distances.
+// Minor waypoint spacing, grades and weather inputs remain scenario estimates.
+[[nodiscard]] std::vector<Leg> bwsc_2025_cruiser_route();
+
 }  // namespace ecm::lab

@@ -40,6 +40,13 @@ int main() {
         assert(profile.entry.config.capacity_wh <= bwsc_2025_cruiser_max_wh);
         assert(profile.entry.config.stage_timing == StageTiming::bwsc_2025);
     }
+    double corridor_km = 0.0;
+    for (const auto& leg : bwsc_2025_cruiser_route()) {
+        corridor_km += leg.distance_km;
+        if (leg.destination == "Barrow Creek") assert(std::abs(corridor_km - 1209.8) < 1e-8);
+        if (leg.destination == "Port Augusta") assert(std::abs(corridor_km - 2717.6) < 1e-8);
+    }
+    assert(std::abs(corridor_km - 3021.5) < 1e-8);
     const auto route = default_route();
     const auto entry = profiles.front().entry;
     const std::vector fleet{entry, entry};

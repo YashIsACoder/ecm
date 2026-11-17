@@ -12,7 +12,7 @@ const smooth = (value) => {
 };
 
 export const carColors = {
-  sunswift: "#2b62af", vtc: "#b54129", solaride: "#368044", onda: "#c2861f", apollo: "#237c81",
+  sunswift: "#2b62af", vtc: "#b54129", solaride: "#368044", onda: "#c2861f", apollo: "#237c81", custom: "#6b4687",
 };
 
 export function loadTerrain() {
@@ -201,7 +201,7 @@ function drawCourse(ctx, points, stops, dark, width) {
     ctx.lineWidth = 2.7;
     ctx.strokeText(stop.name, textX, y - 2);
     ctx.fillText(stop.name, textX, y - 2);
-    if (width < 650) continue;
+    if (width < 650 || !Number.isFinite(stop.km)) continue;
     ctx.font = "11px Georgia, serif";
     const distance = `${Math.round(stop.km).toLocaleString("en-AU")} km`;
     ctx.strokeText(distance, textX, y + 11);
@@ -220,7 +220,7 @@ export function drawCruiserAtlas(canvas, scene) {
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
 
   const { kilometres, stops, racers, active, follow, sun, terrain, motion, showAllStops = false } = scene;
-  const focus = follow ? geographicPosition(kilometres, active.state.distance) : null;
+  const focus = follow && active ? geographicPosition(kilometres, active.state.distance) : null;
   const project = projection(width, height, focus);
   const night = 1 - smooth((sun.elevation + 12) / 17);
   const dark = night > .55;
@@ -228,18 +228,17 @@ export function drawCruiserAtlas(canvas, scene) {
   drawTerrain(ctx, project, terrain, sun, night);
   drawGrid(ctx, width, height, project, dark, !follow);
   const points = course.points.map(project);
-  if (active.state.phase === "drive" || active.state.phase === "control") {
+  if (active?.state.phase === "drive" || active?.state.phase === "control") {
     drawWeather(ctx, positionAt(points, kilometres, active.state.distance), active.state.event, dark, motion);
   }
   drawCourse(ctx, points, stops, dark, width);
-  for (const { id, index, state } of racers) {
+  for (const { id, index, state, paint = carColors[id] ?? policyStyles[id]?.paint } of racers) {
     const [roadX, roadY, angle] = positionAt(points, kilometres, state.distance);
     const stagger = (index - (racers.length - 1) / 2) * 13;
     const x = roadX - Math.sin(angle) * stagger;
     const y = roadY + Math.cos(angle) * stagger;
-    const paint = carColors[id] ?? policyStyles[id].paint;
-    drawCar(ctx, x, y, angle, paint, id === active.id ? .85 : .66, state.depleted, id === active.id);
-    if ((!showAllStops && id !== active.id) || (state.phase !== "control" && state.phase !== "overnight")) continue;
+    drawCar(ctx, x, y, angle, paint, id === active?.id ? .85 : .66, state.depleted, id === active?.id);
+    if ((!showAllStops && id !== active?.id) || (state.phase !== "control" && state.phase !== "overnight")) continue;
     const tag = state.phase === "control" ? "REST" : state.externalChargeWh > 0 ? "TOP-UP" : "PARKED";
     ctx.font = "700 10px Georgia, serif";
     ctx.textAlign = "center";

@@ -52,10 +52,11 @@ void write_sun(std::ostream& out, double coverage_hours) {
 
 void write_atlas_report(std::span<const ecm::lab::Leg> route, ecm::lab::Experiment experiment,
                         std::uint64_t traced_trial, std::string_view model_name, double gust_sd_mps,
-                        std::ostream& out) {
+                        std::optional<ecm::lab::FleetEntry> custom, std::ostream& out) {
     using namespace ecm::lab;
     const auto model = route_energy_model(model_name, gust_sd_mps);
-    const auto profiles = bwsc_2025_cruiser_profiles();
+    auto profiles = bwsc_2025_cruiser_profiles();
+    if (custom) profiles.push_back({"custom", "Custom Cruiser", "Custom Cruiser", "Scenario", std::move(*custom)});
     const auto count = profiles.size();
     std::vector<FleetEntry> field;
     field.reserve(count);

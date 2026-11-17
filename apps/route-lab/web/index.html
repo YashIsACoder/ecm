@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Darwin–Adelaide Route Atlas · SolarRoute Studio</title>
   <link rel="stylesheet" href="./atlas.css">
+  <link rel="stylesheet" href="./lab.css">
   <script src="./atlas.mjs" type="module"></script>
 </head>
 <body>
@@ -12,7 +13,7 @@
     <a class="atlas-brand" href="./">SolarRoute Studio</a>
     <nav aria-label="Pages">
       <a href="./" aria-current="page">Route Atlas</a>
-      <a href="./?view=race">Live Race</a>
+      <a href="./race.html">Live Race</a>
       <a href="./teams.html">Teams</a>
       <a href="./data.html">Data</a>
       <a href="./about.html">About</a>
@@ -40,16 +41,17 @@
               <tbody id="standings"></tbody>
             </table>
           </div>
-          <p id="atlas-status" class="atlas-note" role="status">Loading the native race replay…</p>
+          <p id="atlas-status" class="atlas-note" role="status">Loading the reference simulation…</p>
           <p id="atlas-focus" class="atlas-note"></p>
         </section>
         <div class="atlas-bottom">
           <div id="map-scale" class="atlas-scale" aria-hidden="true"></div>
-          <a href="./configure.html">Experiment setup</a>
+          <a id="configure-fleet" href="#fleet-config">Configure fleet</a>
+          <a href="./configure.html">Single-car strategy lab</a>
         </div>
       </aside>
       <figure class="atlas-figure">
-        <canvas id="atlas-map" role="img" aria-label="Relief map of Australia, showing the five simulated Cruiser cars. Their positions and leg conditions appear in the standings."></canvas>
+        <canvas id="atlas-map" role="img" aria-label="Relief map of Australia, showing the simulated Cruiser fleet. Their positions and leg conditions appear in the standings."></canvas>
         <figcaption><output id="sun-angle" aria-label="Solar position"></output><button id="map-camera" type="button" aria-pressed="false">Follow car</button></figcaption>
       </figure>
     </div>
@@ -66,6 +68,74 @@
       </div>
       <output id="atlas-duration" for="atlas-time"></output>
     </section>
+    <div class="atlas-article atlas-fleet-tools">
+      <details id="fleet-config" class="diagnostics">
+        <summary>Configure fleet simulation</summary>
+        <p class="field-note">Run the 2025 Cruiser presets on the same weather draws. Add a custom car to compare a different hardware or pace specification.</p>
+        <form id="fleet-form">
+          <div class="setup-grid">
+            <fieldset class="setup-card">
+              <legend>Experiment</legend>
+              <label for="fleet-model">ECM variant</label>
+              <select id="fleet-model" name="model">
+                <option value="segment">Segment</option><option value="cycle">Drive cycle</option>
+                <option value="mapped" selected>Mapped cycle</option><option value="gust">Gust-aware cycle</option>
+              </select>
+              <label for="fleet-seed">Seed</label>
+              <input id="fleet-seed" name="seed" type="text" inputmode="numeric" pattern="[0-9]{1,20}" value="2025" required>
+              <div class="field-pair">
+                <div><label for="fleet-trials">Trials</label><input id="fleet-trials" name="trials" type="number" min="1" max="500" value="256" required></div>
+                <div><label for="fleet-draw">Replay draw</label><input id="fleet-draw" name="draw" type="number" min="1" max="256" value="7" required></div>
+              </div>
+            </fieldset>
+            <fieldset class="setup-card">
+              <legend>Weather</legend>
+              <label for="fleet-weather">Forecast</label>
+              <select id="fleet-weather" name="weather"><option value="posterior">Posterior predictive</option><option value="baseline">Synthetic baseline</option></select>
+              <label for="fleet-rain">Rain exposure <span>×</span></label>
+              <input id="fleet-rain" name="rain_multiplier" type="number" min="0" max="8" step="any" value="1" required>
+              <div id="fleet-gust-settings" hidden>
+                <label for="fleet-gust">Gust spread <span>m/s</span></label>
+                <input id="fleet-gust" name="gust_sd_mps" type="number" min="0" max="15" step="any" value="2" required disabled>
+              </div>
+            </fieldset>
+            <fieldset class="setup-card">
+              <legend>Comparison car</legend>
+              <label class="fleet-toggle"><input id="fleet-add-car" type="checkbox"> Add a custom Cruiser</label>
+              <p class="field-note">The five 2025 presets are included in every run. See <a href="./teams.html">Teams</a> for their model inputs.</p>
+            </fieldset>
+          </div>
+          <fieldset id="fleet-car" class="setup-card" disabled hidden>
+            <legend>Custom Cruiser specifications</legend>
+            <div class="fleet-specs-grid">
+              <div><label for="fleet-mass">Mass <span>kg</span></label><input id="fleet-mass" name="mass_kg" type="number" min="120" max="2000" step="any" value="660" required></div>
+              <div><label for="fleet-drag">Drag area <span>m²</span></label><input id="fleet-drag" name="drag_area_m2" type="number" min=".03" max="1.5" step="any" value=".133" required></div>
+              <div><label for="fleet-rolling">Rolling coefficient</label><input id="fleet-rolling" name="rolling_coefficient" type="number" min=".001" max=".03" step="any" value=".005" required></div>
+              <div><label for="fleet-aux">Auxiliary load <span>W</span></label><input id="fleet-aux" name="auxiliary_w" type="number" min="0" max="1500" step="any" value="150" required></div>
+              <div><label for="fleet-pace">Pace ceiling <span>km/h</span></label><input id="fleet-pace" name="custom_pace_kmh" type="number" min="20" max="130" step="any" value="92" required></div>
+              <div><label for="fleet-array">Array area <span>m²</span></label><input id="fleet-array" name="array_m2" type="number" min="0" max="30" step="any" value="4.8" required></div>
+              <div><label for="fleet-cell">Cell efficiency <span>%</span></label><input id="fleet-cell" name="cell_efficiency_pct" type="number" min=".01" max="100" step="any" value="22" required></div>
+              <div><label for="fleet-pack">Usable pack <span>kWh</span></label><input id="fleet-pack" name="pack_kwh" type="number" min=".001" max="15.277777777777779" step="any" placeholder="Default · 55 MJ"></div>
+            </div>
+          </fieldset>
+          <div class="setup-submit">
+            <p id="fleet-feedback" class="field-note" role="status"></p>
+            <button id="run" type="submit" disabled>Run fleet simulation <span aria-hidden="true">→</span></button>
+          </div>
+        </form>
+      </details>
+      <details id="fleet-comparison" class="diagnostics">
+        <summary>Fleet comparison</summary>
+        <p id="current-fleet-run" class="field-note"></p>
+        <div class="atlas-table-wrap">
+          <table>
+            <thead><tr><th scope="col">Car / team</th><th scope="col">Finish rate · 95% interval</th><th scope="col">Difference vs Sunswift · 95% interval</th><th scope="col">Median race time · finishers</th></tr></thead>
+            <tbody id="current-fleet-results"></tbody>
+          </table>
+        </div>
+        <button id="fleet-download" class="download" type="button" disabled>Download run JSON</button>
+      </details>
+    </div>
   </main>
 </body>
 </html>

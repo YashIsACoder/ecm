@@ -12,6 +12,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string_view>
+#include <utility>
 
 namespace {
 
@@ -34,6 +35,9 @@ void help(std::ostream& output) {
         << "--weather baseline|posterior selects the weather model.\n"
         << "--forecast-report emits calibration diagnostics as JSON and exits.\n"
         << "--atlas-report emits a matched Cruiser fleet replay and solar ephemeris for the built-in route.\n"
+        << "--atlas-custom adds a custom Cruiser to the atlas report.\n"
+        << "Custom Cruiser: --mass-kg N --drag-area-m2 N --rolling-coefficient N --auxiliary-w N\n"
+        << "                --custom-pace-kmh N --array-m2 N --cell-efficiency-pct N --pack-kwh N\n"
         << "Defaults: built-in outback route, 2000 trials, seed 2025, reference vehicle and segment model.\n"
         << "Pacing: --steady-kmh N --push-kmh N --reserve-strategy tiers|envelope\n"
         << "        --reserve-fast-kmh N --reserve-medium-kmh N --reserve-slow-kmh N --reserve-target-pct N\n"
@@ -112,6 +116,8 @@ int main(int argc, char** argv) {
         bool bwsc_timing = false;
         bool describe_forecast = false;
         bool describe_atlas = false;
+        bool include_custom = false;
+        std::optional<double> custom_mass, custom_drag, custom_rolling, custom_auxiliary, custom_pace;
         for (int i = 1; i < argc; ++i) {
             const std::string_view option = argv[i];
             if (option == "--help" || option == "-h") {
@@ -129,6 +135,10 @@ int main(int argc, char** argv) {
             }
             if (option == "--atlas-report") {
                 describe_atlas = true;
+                continue;
+            }
+            if (option == "--atlas-custom") {
+                include_custom = true;
                 continue;
             }
             if (++i == argc) {
@@ -152,6 +162,16 @@ int main(int argc, char** argv) {
                 overnight_charge_power = number(value, option, 0, 250000);
             } else if (option == "--gust-sd-mps") {
                 gust_sd_mps = number(value, option, 0, 15);
+            } else if (option == "--mass-kg") {
+                custom_mass = number(value, option, 120, 2000);
+            } else if (option == "--drag-area-m2") {
+                custom_drag = number(value, option, .03, 1.5);
+            } else if (option == "--rolling-coefficient") {
+                custom_rolling = number(value, option, .001, .03);
+            } else if (option == "--auxiliary-w") {
+                custom_auxiliary = number(value, option, 0, 1500);
+            } else if (option == "--custom-pace-kmh") {
+                custom_pace = number(value, option, 20, 130);
             } else if (option == "--trace-trial") {
                 traced_trial = unsigned_value(value);
             } else if (option == "--weather") {
@@ -207,10 +227,29 @@ int main(int argc, char** argv) {
 
         if (describe_atlas) {
             if (route_path) throw std::invalid_argument("--atlas-report uses the built-in outback route");
-            write_atlas_report(ecm::lab::default_route(), experiment, traced_trial.value_or(1),
-                               model, gust_sd_mps, std::cout);
+            std::optional<ecm::lab::FleetEntry> custom;
+            if (include_custom) {
+                custom = ecm::lab::bwsc_2025_cruiser_profiles().front().entry;
+                auto& config = custom->config;
+                config.vehicle.m = custom_mass.value_or(config.vehicle.m);
+                config.vehicle.Cd = custom_drag.value_or(config.vehicle.Cd * config.vehicle.A) / config.vehicle.A;
+                config.vehicle.Crr = custom_rolling.value_or(config.vehicle.Crr);
+                config.vehicle.X = custom_auxiliary.value_or(config.vehicle.X);
+                config.capacity_wh = capacity.value_or(config.capacity_wh);
+                config.array.area_m2 = array_area.value_or(config.array.area_m2);
+                config.array.cell_efficiency = cell_efficiency.value_or(config.array.cell_efficiency);
+                config.strategy.reserve_fast_kmh = custom_pace.value_or(config.strategy.reserve_fast_kmh);
+                config.strategy.reserve_slow_kmh = std::min(config.strategy.reserve_slow_kmh, config.strategy.reserve_fast_kmh);
+            } else if (custom_mass || custom_drag || custom_rolling || custom_auxiliary || custom_pace) {
+                throw std::invalid_argument("custom vehicle inputs require --atlas-custom");
+            }
+            write_atlas_report(ecm::lab::bwsc_2025_cruiser_route(), experiment, traced_trial.value_or(1),
+                               model, gust_sd_mps, std::move(custom), std::cout);
             if (!std::cout.flush()) throw std::runtime_error("failed to write atlas report");
             return 0;
+        }
+        if (include_custom || custom_mass || custom_drag || custom_rolling || custom_auxiliary || custom_pace) {
+            throw std::invalid_argument("custom Cruiser inputs require --atlas-report");
         }
         const auto route = route_path ? ecm::lab::read_route(*route_path) : ecm::lab::default_route();
         auto config = ecm::lab::vehicle_config(vehicle);
