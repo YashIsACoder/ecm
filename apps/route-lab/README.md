@@ -22,8 +22,13 @@ ctest --test-dir build --output-on-failure
 python3 apps/route-lab/serve.py build/bin/solar-race
 ```
 
-Open `http://127.0.0.1:8765` and expand **Experiment setup** to choose the
-route, ECM variant, battery, speed targets, solar array, and weather stressors.
+Open `http://127.0.0.1:8765` for the Cruiser atlas. **Live Race** plays the
+five-car replay from Darwin. Select a car in the standings to inspect its
+weather and solar position. **Teams** shows the scenario inputs, and **Data**
+compares finish rates from matched draws.
+
+Open **Experiment setup** to choose the route, ECM variant, battery, speed
+targets, solar array, and weather stressors for a strategy run.
 **Run experiment** returns to the map. **Race outcomes** opens the same run's
 finish and reserve intervals, reach chart, battery history, and speed history.
 
@@ -58,17 +63,22 @@ See the [forecast model](docs/forecast.md) for MCMC and rain, and the
 
 ## Use the demo on a homepage
 
-Copy the contents of [`web/`](web/) into a static site directory and link to
-that directory with `?replay=1`. The page loads a recorded native SR7 experiment
-with interactive playback and a separate analytics page. The selected draw
-shows the control-stop schedule, a finish and pack depletion. New experiments run through the local lab.
+Copy the contents of [`web/`](web/) into a static site directory. The index
+loads the native five-car fleet report and local terrain sprite, without a
+backend or a map token. Link to `experiment.html?replay=1` for the recorded
+Sunswift pacing comparison. New strategy experiments use the local lab.
 To regenerate the recorded data after rebuilding, run
 
 ```sh
 python3 apps/route-lab/serve.py build/bin/solar-race \
   --export-demo apps/route-lab/web/demo.json
 build/bin/solar-race --forecast-report --seed 2025 > apps/route-lab/web/forecast-demo.json
+build/bin/solar-race --atlas-report --trials 256 --trace-trial 7 --seed 2025 \
+  --model mapped --weather posterior --rain-multiplier 1 > apps/route-lab/web/atlas-demo.json
 ```
+
+See [Cruiser fleet and solar lighting](docs/cruiser-atlas.md) for the native
+APIs, assumptions, and map data sources.
 
 ## Batch experiments
 

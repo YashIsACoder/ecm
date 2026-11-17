@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>About · SolarRoute Studio</title>
+  <link rel="stylesheet" href="./atlas.css">
+</head>
+<body>
+  <header class="atlas-header">
+    <a class="atlas-brand" href="./">SolarRoute Studio</a>
+    <nav aria-label="Pages">
+      <a href="./">Route Atlas</a>
+      <a href="./?view=race">Live Race</a>
+      <a href="./teams.html">Teams</a>
+      <a href="./data.html">Data</a>
+      <a href="./about.html" aria-current="page">About</a>
+    </nav>
+  </header>
+  <main class="atlas-article">
+    <h1>About the atlas</h1>
+    <p>SolarRoute Studio is the browser atlas for the ECM C++ library. It follows five modeled Cruiser cars along a simplified Darwin–Adelaide route using a shared simulated weather draw.</p>
+    <h2>Sun and terrain</h2>
+    <p>The native ephemeris starts on 24 August 2025 at 08:00 ACST. The map projects the sun vector into east, north and up at the selected car. Its compass direction changes the relief shadows, and elevation controls the transition through twilight.</p>
+    <h2>Race timing</h2>
+    <p>Standings show distance driven at the replay time. The simulation includes control holds, overnight charging and late-stage timing under the modeled 2025 Cruiser constraints. The plotted route and car inputs are approximate, and the comparison omits official design judging.</p>
+    <h2>Source material</h2>
+    <ul>
+      <li><a href="https://www.bridgestone.com/bwsc/about/result/">Bridgestone 2025 field and results</a></li>
+      <li><a href="https://cms.worldsolarchallenge.org/app/uploads/2025/03/3297_2025_bwsc_regulations_release_v20_published_28_october_2024-1.pdf">2025 BWSC event regulations</a></li>
+      <li><a href="https://gml.noaa.gov/grad/solcalc/solareqns.PDF">NOAA solar position equations</a></li>
+      <li>Terrain data from <a href="https://www.mapzen.com/blog/terrain-tile-service/">Mapzen</a> and its <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md">source contributors</a>. Coastline from <a href="https://www.naturalearthdata.com/about/terms-of-use/">Natural Earth</a>.</li>
+    </ul>
+    <p class="atlas-links"><a href="./methods.html">Weather and ECM methods</a><a href="./configure.html">Experiment setup</a></p>
+  </main>
+</body>
+</html>

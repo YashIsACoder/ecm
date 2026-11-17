@@ -53,7 +53,7 @@ function addPairedCell(row, values) {
 function render({ data, settings, recorded }) {
   current = data;
   document.querySelector("#cruiser-chart-note").hidden = data.energy_rules !== "bwsc_2025_cruiser";
-  document.querySelector("#back-map").href = `./${runQuery(settings, recorded)}`;
+  document.querySelector("#back-map").href = `./experiment.html${runQuery(settings, recorded)}`;
   feedback.hidden = !recorded;
   if (recorded) feedback.textContent = "Recorded SR7 run";
   results.hidden = false;

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Data · SolarRoute Studio</title>
+  <link rel="stylesheet" href="./atlas.css">
+  <script src="./fleet-pages.mjs" type="module"></script>
+</head>
+<body>
+  <header class="atlas-header">
+    <a class="atlas-brand" href="./">SolarRoute Studio</a>
+    <nav aria-label="Pages">
+      <a href="./">Route Atlas</a>
+      <a href="./?view=race">Live Race</a>
+      <a href="./teams.html">Teams</a>
+      <a href="./data.html" aria-current="page">Data</a>
+      <a href="./about.html">About</a>
+    </nav>
+  </header>
+  <main class="atlas-article">
+    <h1>Cruiser comparison</h1>
+    <p id="fleet-run"></p>
+    <div class="atlas-table-wrap">
+      <table><thead><tr><th scope="col">Car / team</th><th scope="col">Finish rate<br>95% Wilson interval</th><th scope="col">Difference vs Sunswift<br>95% paired interval</th><th scope="col">Median race time<br>Finishers only</th></tr></thead><tbody id="fleet-results"></tbody></table>
+    </div>
+    <p>Each entrant runs on the same weather draw. Intervals describe sampling error in this experiment. Hardware inputs and departure times are scenario assumptions. Race time includes holds and overnight stops.</p>
+    <p class="atlas-links"><a href="./atlas-demo.json" download>Download native fleet JSON</a><a href="./analytics.html?replay=1">Sunswift strategy results</a><a href="./configure.html">Run an experiment</a></p>
+  </main>
+</body>
+</html>

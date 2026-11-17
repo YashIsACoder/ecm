@@ -26,6 +26,18 @@ ROUTES = Path(__file__).resolve().parents[2] / "data" / "routes"
 ROUTE_FILES = {"outback": "outback-2025-style.csv", "rolling": "rolling-1150.csv"}
 ASSETS = {
     "/": ("index.html", "text/html; charset=utf-8"),
+    "/index.html": ("index.html", "text/html; charset=utf-8"),
+    "/atlas.css": ("atlas.css", "text/css; charset=utf-8"),
+    "/atlas.mjs": ("atlas.mjs", "text/javascript; charset=utf-8"),
+    "/atlas-map.mjs": ("atlas-map.mjs", "text/javascript; charset=utf-8"),
+    "/atlas-demo.json": ("atlas-demo.json", "application/json"),
+    "/atlas-relief.webp": ("atlas-relief.webp", "image/webp"),
+    "/experiment.html": ("experiment.html", "text/html; charset=utf-8"),
+    "/fleet-data.mjs": ("fleet-data.mjs", "text/javascript; charset=utf-8"),
+    "/fleet-pages.mjs": ("fleet-pages.mjs", "text/javascript; charset=utf-8"),
+    "/teams.html": ("teams.html", "text/html; charset=utf-8"),
+    "/data.html": ("data.html", "text/html; charset=utf-8"),
+    "/about.html": ("about.html", "text/html; charset=utf-8"),
     "/lab.css": ("lab.css", "text/css; charset=utf-8"),
     "/race-control.css": ("race-control.css", "text/css; charset=utf-8"),
     "/lab.mjs": ("lab.mjs", "text/javascript; charset=utf-8"),

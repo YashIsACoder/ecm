@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Teams · SolarRoute Studio</title>
+  <link rel="stylesheet" href="./atlas.css">
+  <script src="./fleet-pages.mjs" type="module"></script>
+</head>
+<body>
+  <header class="atlas-header">
+    <a class="atlas-brand" href="./">SolarRoute Studio</a>
+    <nav aria-label="Pages">
+      <a href="./">Route Atlas</a>
+      <a href="./?view=race">Live Race</a>
+      <a href="./teams.html" aria-current="page">Teams</a>
+      <a href="./data.html">Data</a>
+      <a href="./about.html">About</a>
+    </nav>
+  </header>
+  <main class="atlas-article">
+    <h1>2025 Cruiser teams</h1>
+    <p>Five entrants from the 2025 field. Their car names and teams come from the event records. The numbers below are the inputs used in the ECM comparison.</p>
+    <div class="atlas-table-wrap">
+      <table><thead><tr><th scope="col">Car / team</th><th scope="col">Region</th><th scope="col">Race mass<br>(kg)</th><th scope="col">Drag area<br>(m²)</th><th scope="col">Array<br>(m²)</th><th scope="col">Usable pack<br>(kWh)</th><th scope="col">Pace ceiling<br>(km/h)</th></tr></thead><tbody id="fleet-specs"></tbody></table>
+    </div>
+    <p>Rival vehicle inputs are estimates for this simulation. Every entrant uses the same modeled Cruiser schedule, capacity limit and family of energy-envelope strategies.</p>
+    <p class="atlas-links"><a href="./data.html">Compare simulated finishes</a><a href="https://www.bridgestone.com/bwsc/about/result/">Official 2025 entrants and results</a></p>
+  </main>
+</body>
+</html>

@@ -17,10 +17,29 @@ def main() -> None:
             url = server.stdout.readline().strip().rsplit(" ", 1)[-1]
             assert url.startswith("http://127.0.0.1:")
             with urlopen(url, timeout=5) as page:
+                atlas = page.read().decode()
+                assert "SolarRoute Studio" in atlas and 'id="standings"' in atlas
+                assert all(link in atlas for link in ("?view=race", "./teams.html", "./data.html", "./about.html"))
+            with urlopen(url + "/experiment.html", timeout=5) as page:
                 dashboard = page.read().decode()
                 assert "Route Lab" in dashboard and "Experiment setup" in dashboard
                 assert 'class="atlas-spread"' in dashboard and 'id="route-map"' in dashboard
                 assert "./analytics.html" in dashboard and 'id="reach"' not in dashboard
+            with urlopen(url + "/atlas-relief.webp", timeout=5) as asset:
+                assert asset.headers.get_content_type() == "image/webp"
+                assert asset.read(4) == b"RIFF"
+            with urlopen(url + "/atlas-demo.json", timeout=5) as response:
+                roster = json.load(response)
+                assert roster["model"] == "mapped" and roster["weather"] == "posterior"
+                assert [team["id"] for team in roster["teams"]] == ["sunswift", "vtc", "solaride", "onda", "apollo"]
+                assert all(team["legs"] and team["pace_ceiling_kmh"] > 0 for team in roster["teams"])
+                ephemeris = roster["solar"]
+                assert ephemeris["start_utc"] == "2025-08-23T22:30:00Z"
+                assert (len(ephemeris["vectors"]) - 1) * ephemeris["step_minutes"] / 60 >= roster["horizon_hours"]
+            for page, phrase in (("teams.html", "2025 Cruiser teams"), ("data.html", "Cruiser comparison"),
+                                 ("about.html", "Sun and terrain")):
+                with urlopen(url + "/" + page, timeout=5) as content:
+                    assert phrase in content.read().decode()
             with urlopen(url + "/analytics.html?trials=8", timeout=5) as page:
                 analytics = page.read().decode()
                 assert 'id="reach"' in analytics and 'id="history-time"' in analytics

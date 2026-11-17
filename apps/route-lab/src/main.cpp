@@ -208,7 +208,7 @@ int main(int argc, char** argv) {
         if (describe_atlas) {
             if (route_path) throw std::invalid_argument("--atlas-report uses the built-in outback route");
             write_atlas_report(ecm::lab::default_route(), experiment, traced_trial.value_or(1),
-                               ecm::lab::route_energy_model(model, gust_sd_mps), std::cout);
+                               model, gust_sd_mps, std::cout);
             if (!std::cout.flush()) throw std::runtime_error("failed to write atlas report");
             return 0;
         }

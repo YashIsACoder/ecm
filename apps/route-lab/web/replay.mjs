@@ -113,7 +113,7 @@ function polyline(ctx, points) {
   points.forEach(([x, y], index) => index === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
 }
 
-function drawCar(ctx, x, y, angle, color, size, depleted, selected) {
+export function drawCar(ctx, x, y, angle, color, size, depleted, selected) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle + Math.PI / 2);
@@ -200,7 +200,7 @@ export function skyCondition(event) {
   return "Overcast";
 }
 
-function drawWeather(ctx, centre, weather, dark, seconds) {
+export function drawWeather(ctx, centre, weather, dark, seconds) {
   const [x, y] = centre;
   const cloud = 1 - clamp(weather.solar_factor, 0, 1);
   const rain = weather.rain_mm_h ?? 0;

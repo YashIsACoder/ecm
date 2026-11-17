@@ -72,7 +72,7 @@ export function mountSetup(container, initial) {
       form.elements.seed.focus();
       return;
     }
-    location.assign(`./${setupQuery(settings)}`);
+    location.assign(`./experiment.html${setupQuery(settings)}`);
   });
 
   fileInput.addEventListener("change", async () => {
@@ -94,5 +94,5 @@ const standalone = document.querySelector(".setup-page");
 if (standalone) {
   const initial = settingsFromQuery(location.search);
   mountSetup(standalone, initial);
-  document.querySelector("#back-results").href = `./${setupQuery(initial)}`;
+  document.querySelector("#back-results").href = `./experiment.html${setupQuery(initial)}`;
 }

@@ -51,8 +51,10 @@ void write_sun(std::ostream& out, double coverage_hours) {
 }  // namespace
 
 void write_atlas_report(std::span<const ecm::lab::Leg> route, ecm::lab::Experiment experiment,
-                        std::uint64_t traced_trial, const ecm::lab::RouteEnergyModel& model, std::ostream& out) {
+                        std::uint64_t traced_trial, std::string_view model_name, double gust_sd_mps,
+                        std::ostream& out) {
     using namespace ecm::lab;
+    const auto model = route_energy_model(model_name, gust_sd_mps);
     const auto profiles = bwsc_2025_cruiser_profiles();
     const auto count = profiles.size();
     std::vector<FleetEntry> field;
@@ -76,7 +78,11 @@ void write_atlas_report(std::span<const ecm::lab::Leg> route, ecm::lab::Experime
     }});
 
     out << std::fixed << std::setprecision(6) << "{\"trials\":" << experiment.trials
-        << ",\"seed\":\"" << experiment.seed << "\",\"draw\":" << traced_trial << ",\"points\":[";
+        << ",\"seed\":\"" << experiment.seed << "\",\"draw\":" << traced_trial
+        << ",\"model\":" << std::quoted(model_name)
+        << ",\"weather\":" << std::quoted(experiment.weather == WeatherModel::posterior ? "posterior" : "baseline")
+        << ",\"rain_multiplier\":" << experiment.rain_multiplier << ",\"gust_sd_mps\":" << gust_sd_mps
+        << ",\"points\":[";
     double distance = 0.0;
     for (std::size_t i = 0; i < route.size(); ++i) {
         if (i) out << ',';
