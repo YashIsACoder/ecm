@@ -1,5 +1,6 @@
 import { drawTelemetryHistory, policyStyles, raceClock, replaySpeed, traceAt } from "./replay.mjs";
-import { downloadFile, numbers, percent, policyLabels as labels, readRun, runQuery, runSummary } from "./run-data.mjs";
+import { downloadFile, numbers, percent, policyLabels as labels, readRun, replayContext, runQuery, runSummary, withReplayContext } from "./run-data.mjs";
+import { setupQuery } from "./scenario.mjs";
 
 const feedback = document.querySelector("#run-feedback");
 const status = document.querySelector("#status");
@@ -18,7 +19,12 @@ const values = document.querySelector("#history-values");
 const battery = document.querySelector("#battery");
 const historyTitle = document.querySelector("#history-title");
 const historyButtons = [...document.querySelectorAll(".history-switch button")];
+const back = document.querySelector("#back-map");
+const editRun = document.querySelector("#edit-run");
+const view = replayContext(location.search);
 let current;
+let replayQuery;
+let editQuery;
 let mode = "battery";
 
 const pointDelta = (value) => {
@@ -53,7 +59,10 @@ function addPairedCell(row, values) {
 function render({ data, settings, recorded }) {
   current = data;
   document.querySelector("#cruiser-chart-note").hidden = data.energy_rules !== "bwsc_2025_cruiser";
-  document.querySelector("#back-map").href = `./experiment.html${runQuery(settings, recorded)}`;
+  replayQuery = runQuery(settings, recorded);
+  const params = new URLSearchParams(setupQuery(settings));
+  if (recorded) params.set("replay", "1");
+  editQuery = params;
   feedback.hidden = !recorded;
   if (recorded) feedback.textContent = "Recorded SR7 run";
   results.hidden = false;
@@ -90,9 +99,8 @@ function render({ data, settings, recorded }) {
   const { logs, draw } = data.trace;
   document.querySelector("#draw-label").textContent = `DRAW ${draw} OF ${numbers.format(data.trials)}`;
   const horizon = Math.max(...Object.values(logs).map((events) => events.at(-1).race_arrive_hours));
-  const at = Number(new URLSearchParams(location.search).get("at")) || 0;
   slider.max = horizon;
-  slider.value = Math.max(0, Math.min(horizon, at));
+  slider.value = Math.min(horizon, view.at);
   slider.disabled = horizon === 0;
   drawChart();
   drawHistory();
@@ -121,9 +129,9 @@ function drawChart() {
   const maxDistance = current.distances_km.at(-1);
   const x = (distance) => left + (right - left) * distance / maxDistance;
   const y = (share) => bottom - (bottom - top) * share;
-  ctx.font = "11px system-ui, sans-serif";
+  ctx.font = "12px Georgia, serif";
   ctx.fillStyle = color("--muted");
-  ctx.strokeStyle = color("--line");
+  ctx.strokeStyle = color("--rule");
   ctx.textBaseline = "middle";
   ctx.textAlign = "right";
   for (const share of [0, .25, .5, .75, 1]) {
@@ -160,6 +168,9 @@ function drawChart() {
 function drawHistory() {
   if (!current) return;
   const hour = Number(slider.value);
+  const point = { at: hour, policy: view.policy };
+  back.href = `./experiment.html${withReplayContext(replayQuery, point)}`;
+  editRun.href = `./configure.html${withReplayContext(editQuery, point)}`;
   const { logs } = current.trace;
   const states = Object.fromEntries(Object.entries(logs).map(([name, events]) => [name, traceAt(events, hour)]));
   const { day, clock } = raceClock(hour);

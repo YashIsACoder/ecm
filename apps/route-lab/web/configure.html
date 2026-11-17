@@ -3,17 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Configure a run · Sunswift Route Lab</title>
+  <title>Experiment setup · SolarRoute Studio</title>
+  <link rel="stylesheet" href="./atlas.css">
   <link rel="stylesheet" href="./lab.css">
-  <link rel="stylesheet" href="./race-control.css">
   <script src="./configure.mjs" type="module"></script>
 </head>
 <body>
-  <header class="top">
-    <a class="brand" href="./"><span class="mark" aria-hidden="true"></span>Sunswift Route Lab</a>
-    <nav aria-label="Pages"><a href="./experiment.html" id="back-results">Race control</a><a href="./methods.html">Methods ↗</a></nav>
+  <header class="atlas-header">
+    <a class="atlas-brand" href="./">SolarRoute Studio</a>
+    <nav aria-label="Pages">
+      <a href="./">Route Atlas</a>
+      <a href="./?view=race">Live Race</a>
+      <a href="./teams.html">Teams</a>
+      <a href="./data.html">Data</a>
+      <a href="./about.html">About</a>
+    </nav>
   </header>
-  <main class="setup-page">
+  <nav class="workspace-nav" aria-label="Experiment">
+    <a href="./configure.html" aria-current="page">Experiment setup</a>
+    <a href="./experiment.html" id="back-results">Replay</a>
+    <a href="./analytics.html" id="setup-outcomes">Race outcomes</a>
+    <a href="./methods.html">Methods</a>
+  </nav>
+  <main class="atlas-article setup-page">
     <div class="intro">
       <div>
         <h1>Configure a run</h1>

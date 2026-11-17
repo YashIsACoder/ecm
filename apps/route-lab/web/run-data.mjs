@@ -9,6 +9,26 @@ export function runQuery(settings, recorded) {
   return recorded ? "?replay=1" : setupQuery(settings);
 }
 
+export function replayContext(query) {
+  const params = new URLSearchParams(query);
+  const at = Number(params.get("at"));
+  const policy = params.get("policy");
+  return {
+    at: Number.isFinite(at) && at > 0 ? at : 0,
+    policy: Object.hasOwn(policyLabels, policy) ? policy : undefined,
+  };
+}
+
+export function withReplayContext(query, { at, policy }) {
+  const params = new URLSearchParams(query);
+  if (Number.isFinite(at) && at > 0) params.set("at", String(at));
+  else params.delete("at");
+  if (Object.hasOwn(policyLabels, policy)) params.set("policy", policy);
+  else params.delete("policy");
+  const serialized = params.toString();
+  return serialized ? `?${serialized}` : "";
+}
+
 export function runSummary(data, settings) {
   const strategy = settings.reserve_strategy === "envelope" ? "Energy envelope" : "Speed tiers";
   const weather = settings.weather === "posterior" ? "Posterior weather" : "Baseline weather";
@@ -39,12 +59,10 @@ export async function readRun({ reuse = false } = {}) {
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || "The experiment failed.");
   const run = { data, settings, recorded: false };
-  if (!reuse) {
-    try {
-      sessionStorage.setItem(cacheKey, JSON.stringify({ query, run }));
-    } catch {
-      // The results still work if storage is disabled or its quota is exceeded.
-    }
+  try {
+    sessionStorage.setItem(cacheKey, JSON.stringify({ query, run }));
+  } catch {
+    // The results still work if storage is disabled or its quota is exceeded.
   }
   return run;
 }

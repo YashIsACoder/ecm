@@ -1,4 +1,5 @@
 import { readSetupFile, settingsFromQuery, setupQuery } from "./scenario.mjs";
+import { replayContext, runQuery, withReplayContext } from "./run-data.mjs";
 
 export function mountSetup(container, initial) {
   const form = container.querySelector("#experiment");
@@ -92,7 +93,10 @@ export function mountSetup(container, initial) {
 
 const standalone = document.querySelector(".setup-page");
 if (standalone) {
-  const initial = settingsFromQuery(location.search);
+  const query = new URLSearchParams(location.search);
+  const initial = settingsFromQuery(query);
   mountSetup(standalone, initial);
-  document.querySelector("#back-results").href = `./experiment.html${setupQuery(initial)}`;
+  const context = withReplayContext(runQuery(initial, query.get("replay") === "1"), replayContext(query));
+  document.querySelector("#back-results").href = `./experiment.html${context}`;
+  document.querySelector("#setup-outcomes").href = `./analytics.html${context}`;
 }

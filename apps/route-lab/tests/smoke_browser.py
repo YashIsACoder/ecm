@@ -22,8 +22,8 @@ def main() -> None:
                 assert all(link in atlas for link in ("?view=race", "./teams.html", "./data.html", "./about.html"))
             with urlopen(url + "/experiment.html", timeout=5) as page:
                 dashboard = page.read().decode()
-                assert "Route Lab" in dashboard and "Experiment setup" in dashboard
-                assert 'class="atlas-spread"' in dashboard and 'id="route-map"' in dashboard
+                assert "SolarRoute Studio" in dashboard and "Experiment setup" in dashboard
+                assert 'class="atlas-sheet experiment-sheet"' in dashboard and 'id="route-map"' in dashboard
                 assert "./analytics.html" in dashboard and 'id="reach"' not in dashboard
             with urlopen(url + "/atlas-relief.webp", timeout=5) as asset:
                 assert asset.headers.get_content_type() == "image/webp"
@@ -40,6 +40,12 @@ def main() -> None:
                                  ("about.html", "Sun and terrain")):
                 with urlopen(url + "/" + page, timeout=5) as content:
                     assert phrase in content.read().decode()
+            for page in ("experiment.html", "configure.html", "analytics.html", "methods.html"):
+                with urlopen(url + "/" + page, timeout=5) as content:
+                    document = content.read().decode()
+                    assert 'href="./atlas.css"' in document and 'class="atlas-header"' in document
+                    assert all(link in document for link in ("?view=race", "./teams.html", "./data.html", "./about.html"))
+                    assert 'aria-label="Experiment"' in document
             with urlopen(url + "/analytics.html?trials=8", timeout=5) as page:
                 analytics = page.read().decode()
                 assert 'id="reach"' in analytics and 'id="history-time"' in analytics

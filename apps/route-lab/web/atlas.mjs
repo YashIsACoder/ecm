@@ -1,4 +1,4 @@
-import { carColors, drawCruiserAtlas, geographicPosition, sunAt } from "./atlas-map.mjs";
+import { carColors, drawCruiserAtlas, geographicPosition, loadTerrain, sunAt } from "./atlas-map.mjs";
 import { fleetRows, loadFleet } from "./fleet-data.mjs";
 import { checkpointHour, playbackTimeline, raceClock, replaySpeed, routeBook, skyCondition, traceAt, translateTime } from "./replay.mjs";
 import { defaultSettings } from "./scenario.mjs";
@@ -208,12 +208,10 @@ async function start() {
   status.textContent = `Simulated positions · draw ${fleet.draw} · seed ${fleet.seed}`;
   makeRows(fleet.teams);
   makeStops();
-  const image = new Image();
-  image.addEventListener("load", () => {
+  loadTerrain().then((image) => {
     terrain = image;
     render();
   });
-  image.src = "./atlas-relief.webp";
   render();
   if (live) {
     document.querySelector("nav [aria-current]").removeAttribute("aria-current");

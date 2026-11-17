@@ -31,6 +31,8 @@ Open **Experiment setup** to choose the route, ECM variant, battery, speed
 targets, solar array, and weather stressors for a strategy run.
 **Run experiment** returns to the map. **Race outcomes** opens the same run's
 finish and reserve intervals, reach chart, battery history, and speed history.
+The replay and outcomes links keep the inspected race time and the selected
+strategy when you move between them.
 
 Choose 0.5×, 1×, 2× or 4× playback. **Race highlights** gives control holds more
 screen time and speeds through shared overnight parking. **Uniform time scale**

@@ -24,6 +24,8 @@ function drawTrace() {
   chart.height = Math.round(height * ratio);
   const ctx = chart.getContext("2d");
   ctx.scale(ratio, ratio);
+  const theme = getComputedStyle(chart);
+  const color = (token) => theme.getPropertyValue(token).trim();
   const left = 49, right = width - 16, top = 14, bottom = height - 27;
   const points = chains[0].samples.length;
   const values = chains.flatMap((chain) => chain.samples);
@@ -39,17 +41,17 @@ function drawTrace() {
   ctx.font = "11px ui-monospace, monospace";
   for (const fraction of [0, .25, .5, .75, 1]) {
     const value = low + (high - low) * fraction;
-    ctx.fillStyle = "#545f52";
+    ctx.fillStyle = color("--muted");
     ctx.fillText((value * scale).toFixed(1), left - 8, y(value));
-    ctx.fillStyle = "#adb7aa";
+    ctx.fillStyle = color("--rule");
     ctx.fillRect(left, y(value), right - left, 1);
   }
   ctx.textAlign = "left";
-  ctx.fillStyle = "#545f52";
+  ctx.fillStyle = color("--muted");
   ctx.fillText("First retained", left, bottom + 15);
   ctx.textAlign = "right";
   ctx.fillText("Last plotted", right, bottom + 15);
-  ctx.strokeStyle = "#23372a";
+  ctx.strokeStyle = color("--green");
   ctx.setLineDash([5, 4]);
   ctx.beginPath();
   ctx.moveTo(left, y(exact_mean));
@@ -67,7 +69,7 @@ function drawTrace() {
     ctx.stroke();
   });
   ctx.globalAlpha = 1;
-  ctx.fillStyle = "#915340";
+  ctx.fillStyle = color("--rust");
   ctx.fillRect(x(index), top, 1, bottom - top);
   chains.forEach((chain, c) => {
     ctx.beginPath();

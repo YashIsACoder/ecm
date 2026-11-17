@@ -3,17 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Forecast methods · Sunswift Route Lab</title>
+  <title>Forecast methods · SolarRoute Studio</title>
+  <link rel="stylesheet" href="./atlas.css">
   <link rel="stylesheet" href="./lab.css">
-  <link rel="stylesheet" href="./race-control.css">
   <script src="./methods.mjs" type="module"></script>
 </head>
 <body>
-  <header class="top">
-    <a class="brand" href="./"><span class="mark" aria-hidden="true"></span>Sunswift Route Lab</a>
-    <nav aria-label="Pages"><a href="./experiment.html">Race control <span aria-hidden="true">↗</span></a></nav>
+  <header class="atlas-header">
+    <a class="atlas-brand" href="./">SolarRoute Studio</a>
+    <nav aria-label="Pages">
+      <a href="./">Route Atlas</a>
+      <a href="./?view=race">Live Race</a>
+      <a href="./teams.html">Teams</a>
+      <a href="./data.html">Data</a>
+      <a href="./about.html">About</a>
+    </nav>
   </header>
-  <main class="methods">
+  <nav class="workspace-nav" aria-label="Experiment">
+    <a href="./configure.html">Experiment setup</a>
+    <a href="./experiment.html?replay=1">Replay</a>
+    <a href="./analytics.html?replay=1">Race outcomes</a>
+    <a href="./methods.html" aria-current="page">Methods</a>
+  </nav>
+  <main class="atlas-article methods">
     <div class="intro">
       <div>
         <h1>Forecast methods</h1>
@@ -87,7 +99,7 @@
         <p>Finish and reserve rates use 95% Wilson intervals. Differences from Steady use paired Newcombe intervals. The intervals quantify Monte Carlo sampling error under the simulated conditions.</p>
       </article>
     </section>
-    <footer class="method-sources">
+    <footer class="method-sources atlas-links">
       <a href="https://www.bom.gov.au/climate/averages/tables/cw_014015.shtml">Bureau of Meteorology climate records</a>
       <a href="https://dlmf.nist.gov/3.5#v">NIST Gauss quadrature</a>
       <a href="https://www.cambridge.org/engage/miir/article-details/662cb561418a5379b0db608a">Solar race strategy research</a>

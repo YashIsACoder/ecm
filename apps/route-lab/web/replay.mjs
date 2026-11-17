@@ -475,7 +475,7 @@ export function drawTelemetryHistory(canvas, logs, hours, horizon, positions, mo
     const reserve = !speedMode && value === 15;
     polyline(ctx, [[left, y(value)], [right, y(value)]]);
     ctx.setLineDash(reserve ? [3, 4] : []);
-    ctx.strokeStyle = color(reserve ? "--rust" : "--line");
+    ctx.strokeStyle = color(reserve ? "--rust" : "--rule");
     ctx.lineWidth = 1;
     ctx.stroke();
     ctx.fillStyle = color("--muted");

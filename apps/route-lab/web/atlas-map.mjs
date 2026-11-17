@@ -1,5 +1,5 @@
 import { australia, routes } from "./map-data.mjs";
-import { drawCar, drawWeather, positionAt } from "./replay.mjs";
+import { drawCar, drawWeather, policyStyles, positionAt } from "./replay.mjs";
 
 const terrainBounds = { west: 111, east: 155, south: -44, north: -9 };
 const course = routes.outback;
@@ -14,6 +14,15 @@ const smooth = (value) => {
 export const carColors = {
   sunswift: "#2b62af", vtc: "#b54129", solaride: "#368044", onda: "#c2861f", apollo: "#237c81",
 };
+
+export function loadTerrain() {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.addEventListener("load", () => resolve(image), { once: true });
+    image.addEventListener("error", () => resolve(null), { once: true });
+    image.src = "./atlas-relief.webp";
+  });
+}
 
 export function sunAt(ephemeris, hour, [longitude, latitude]) {
   const { vectors, step_minutes: step } = ephemeris;
@@ -210,7 +219,7 @@ export function drawCruiserAtlas(canvas, scene) {
   if (!ctx) return 0;
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
 
-  const { kilometres, stops, racers, active, follow, sun, terrain, motion } = scene;
+  const { kilometres, stops, racers, active, follow, sun, terrain, motion, showAllStops = false } = scene;
   const focus = follow ? geographicPosition(kilometres, active.state.distance) : null;
   const project = projection(width, height, focus);
   const night = 1 - smooth((sun.elevation + 12) / 17);
@@ -225,19 +234,22 @@ export function drawCruiserAtlas(canvas, scene) {
   drawCourse(ctx, points, stops, dark, width);
   for (const { id, index, state } of racers) {
     const [roadX, roadY, angle] = positionAt(points, kilometres, state.distance);
-    const stagger = (index - 2) * 13;
+    const stagger = (index - (racers.length - 1) / 2) * 13;
     const x = roadX - Math.sin(angle) * stagger;
     const y = roadY + Math.cos(angle) * stagger;
-    drawCar(ctx, x, y, angle, carColors[id], id === active.id ? .85 : .66, state.depleted, id === active.id);
-    if (id !== active.id || (state.phase !== "control" && state.phase !== "overnight")) continue;
+    const paint = carColors[id] ?? policyStyles[id].paint;
+    drawCar(ctx, x, y, angle, paint, id === active.id ? .85 : .66, state.depleted, id === active.id);
+    if ((!showAllStops && id !== active.id) || (state.phase !== "control" && state.phase !== "overnight")) continue;
     const tag = state.phase === "control" ? "REST" : state.externalChargeWh > 0 ? "TOP-UP" : "PARKED";
     ctx.font = "700 10px Georgia, serif";
     ctx.textAlign = "center";
     const tagWidth = ctx.measureText(tag).width + 10;
     ctx.fillStyle = "#273923";
-    ctx.fillRect(x - tagWidth / 2, y - 29, tagWidth, 14);
+    const tagX = x + (showAllStops ? (index - (racers.length - 1) / 2) * 10 : 0);
+    const tagY = y - 22 - (showAllStops ? index % 2 * 14 : 0);
+    ctx.fillRect(tagX - tagWidth / 2, tagY - 7, tagWidth, 14);
     ctx.fillStyle = "#fff5db";
-    ctx.fillText(tag, x, y - 22);
+    ctx.fillText(tag, tagX, tagY);
   }
   // East–west scale at 25 degrees south, where longitude spans about 101 km/degree.
   return (project([121, -25])[0] - project([120, -25])[0]) / (111.195 * Math.cos(25 * radians));

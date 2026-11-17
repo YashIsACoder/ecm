@@ -1,11 +1,13 @@
 "use strict";
 
 import { routes } from "./map-data.mjs";
+import { drawCruiserAtlas, geographicPosition, loadTerrain, sunAt } from "./atlas-map.mjs";
+import { loadFleet } from "./fleet-data.mjs";
 import { atlasLighting, checkpointHour, drawRouteMap, playbackTimeline, raceClock, replaySpeed, routeBook, skyCondition, traceAt, translateTime } from "./replay.mjs";
 
 import { mountSetup } from "./configure.mjs";
 import { settingsFromQuery, setupQuery } from "./scenario.mjs";
-import { downloadFile, numbers, percent, policyLabels as labels, readRun, runQuery, runSummary } from "./run-data.mjs";
+import { downloadFile, numbers, percent, policyLabels as labels, readRun, replayContext, runQuery, runSummary, withReplayContext } from "./run-data.mjs";
 
 const feedback = document.querySelector("#run-feedback");
 const replay = document.querySelector("#replay");
@@ -57,6 +59,10 @@ let timeline;
 let scenario;
 let camera = "overview";
 let stops;
+let kilometres;
+let terrain;
+let ephemeris;
+let viewQuery;
 let motion = 0;
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const phaseLabels = { drive: "On course", control: "REST", overnight: "Parked", finish: "Finished", depleted: "Depleted" };
@@ -73,7 +79,7 @@ function resetReplay() {
     const to = document.createElement("span");
     to.textContent = ends[1];
     to.className = "atlas-destination";
-    mapHeading.replaceChildren(document.createTextNode(ends[0]), to);
+    mapHeading.replaceChildren(document.createTextNode(`${ends[0]} – `), to);
     mapHeading.setAttribute("aria-label", mapRoute.title);
   } else {
     mapHeading.textContent = mapRoute.title;
@@ -88,8 +94,12 @@ function resetReplay() {
   leg.max = timeline.at(-1).hour;
   leg.disabled = Number(leg.max) === 0;
   play.disabled = leg.disabled;
-  leg.value = 0;
-  stops = routeBook(current.trace.points, mapRoute.start).map(({ name, km, leg: stopLeg }) => {
+  const view = replayContext(location.search);
+  leg.value = Math.min(view.at, Number(leg.max));
+  if (view.policy) logPolicy.value = view.policy;
+  kilometres = [0, ...current.trace.points.map(({ km }) => km)];
+  stops = routeBook(current.trace.points, mapRoute.start).map((stop) => {
+    const { name, km, leg: stopLeg } = stop;
     const item = document.createElement("li");
     const button = document.createElement("button");
     button.type = "button";
@@ -100,7 +110,7 @@ function resetReplay() {
     button.append(place, distance);
     button.addEventListener("click", () => jumpTo(checkpointHour(current.trace.logs[logPolicy.value], stopLeg)));
     item.append(button);
-    return { item, button, leg: stopLeg };
+    return { ...stop, item, button };
   });
   controlStops.replaceChildren(...stops.map(({ item }) => item));
   readouts.replaceChildren();
@@ -137,15 +147,11 @@ function renderReplay() {
   legLabel.textContent = `${hour.toFixed(1)} / ${horizon.toFixed(1)} h`;
   leg.style.setProperty("--progress", `${horizon > 0 ? hour / horizon * 100 : 0}%`);
   leg.setAttribute("aria-valuetext", `Day ${day}, ${clock}. ${hour.toFixed(1)} race hours elapsed.`);
-  const analytics = new URL(analyticsLinks[1].href);
-  if (hour > 0) analytics.searchParams.set("at", hour.toFixed(6));
-  else analytics.searchParams.delete("at");
-  if (analytics.href !== analyticsLinks[1].href) analyticsLinks[1].href = analytics.href;
+  const analyticsHref = `./analytics.html${withReplayContext(viewQuery, { at: hour, policy: selected })}`;
+  for (const link of analyticsLinks) link.href = analyticsHref;
   renderTelemetry(selected, positions[selected], lighting.label);
   nextRest.disabled = nextControlHour() === undefined;
   nextCharge.disabled = nextChargeHour() === undefined;
-  replay.classList.toggle("is-dark", lighting.dark);
-  replay.style.setProperty("--atlas-water", lighting.palette.water);
   for (const row of readouts.children) {
     const state = positions[row.dataset.policy];
     row.setAttribute("aria-pressed", String(row.dataset.policy === selected));
@@ -153,8 +159,17 @@ function renderReplay() {
     row.lastElementChild.textContent = `${numbers.format(state.distance)} km · ${charge}`;
   }
   const remaining = current.distances_km.at(-1) - positions[selected].distance;
-  mapProgress.textContent = `${numbers.format(remaining)} km to finish`;
-  drawRouteMap(map, current.trace, positions, selected, { lighting, camera, motion: reducedMotion.matches ? 0 : motion });
+  mapProgress.textContent = `${numbers.format(remaining)} km`;
+  const movement = reducedMotion.matches ? 0 : motion;
+  if (ephemeris && hour * 60 <= (ephemeris.vectors.length - 1) * ephemeris.step_minutes) {
+    const racers = Object.entries(positions).map(([id, state], index) => ({ id, state, index }));
+    const active = racers.find(({ id }) => id === selected);
+    const sun = sunAt(ephemeris, hour, geographicPosition(kilometres, active.state.distance));
+    drawCruiserAtlas(map, { kilometres, stops, racers, active, follow: camera === "follow", sun, terrain,
+      motion: movement, showAllStops: true });
+  } else {
+    drawRouteMap(map, current.trace, positions, selected, { lighting, camera, motion: movement });
+  }
   for (const { button, leg: stopLeg } of stops) {
     const arrival = checkpointHour(current.trace.logs[selected], stopLeg);
     button.disabled = arrival === undefined;
@@ -221,7 +236,6 @@ function renderTelemetry(policy, state, lightLabel) {
   cloudDisplay.textContent = weatherAvailable ? percent(event.solar_factor) : "—";
   const rain = event.rain_mm_h ?? 0;
   const wetness = event.road_wetness ?? 0;
-  mapSky.parentElement.dataset.rain = String(weatherAvailable && rain > 0);
   mapSky.textContent = weatherAvailable ? `${lightLabel} · ${skyCondition(event)}` : lightLabel;
   const rainRate = rain < .05 ? "<0.1" : rain.toFixed(1);
   rainDisplay.textContent = !weatherAvailable ? "—" : rain > 0 ? `${rainRate} mm/h` : "Dry";
@@ -389,7 +403,6 @@ async function openSetup() {
 }
 
 setup.addEventListener("toggle", openSetup);
-if (location.hash === "#setup") setup.open = true;
 setup.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && setup.open) {
     setup.open = false;
@@ -399,7 +412,7 @@ setup.addEventListener("keydown", (event) => {
 
 async function runExperiment() {
   try {
-    const { data, settings, recorded } = await readRun();
+    const { data, settings, recorded } = await readRun({ reuse: true });
     current = data;
     const cruiser = data.energy_rules === "bwsc_2025_cruiser";
     nextCharge.hidden = !cruiser;
@@ -410,10 +423,15 @@ async function runExperiment() {
       raceSpec.textContent = settings.vehicle === "reference" ? "Reference solar car" : settings.vehicle.toUpperCase();
     }
     scenario = { version: 1, settings, ...data.reproduce };
-    analyticsLinks.forEach((link) => {
-      link.href = `./analytics.html${runQuery(settings, recorded)}`;
-    });
+    viewQuery = runQuery(settings, recorded);
+    const setupLink = setupHost.querySelector("#setup-page-link");
+    if (setupLink) setupLink.href = `./configure.html${setupQuery(settings)}`;
     drawLabel.textContent = (recorded ? "RECORDED · " : "") + runSummary(data, settings);
+    if (data.trace.route === "outback") {
+      const [fleet, image] = await Promise.all([loadFleet().catch(() => null), loadTerrain()]);
+      ephemeris = fleet?.solar;
+      terrain = image;
+    }
     saveScenario.disabled = false;
     feedback.hidden = true;
     resetReplay();
@@ -459,4 +477,6 @@ logPolicy.addEventListener("change", renderReplay);
 reducedMotion.addEventListener("change", renderReplay);
 
 new ResizeObserver(renderReplay).observe(map);
-runExperiment();
+runExperiment().finally(() => {
+  if (location.hash === "#setup") setup.open = true;
+});

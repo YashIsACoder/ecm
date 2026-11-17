@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { defaultSettings, readSetupFile, settingsFromQuery, setupQuery } from "../web/scenario.mjs";
+import { replayContext, withReplayContext } from "../web/run-data.mjs";
 import { atlasLighting, checkpointHour, drawRouteMap, routeBook, playbackTimeline, raceClock, replaySpeed, skyCondition, traceAt, translateTime } from "../web/replay.mjs";
 
 const { result: { trace } } = JSON.parse(readFileSync(new URL("../web/demo.json", import.meta.url)));
@@ -60,6 +61,10 @@ assert.deepEqual(readSetupFile(JSON.stringify({ version: 1, settings: setup })),
 assert.throws(() => readSetupFile(JSON.stringify({ version: 1, settings: { ...setup, seed: 15 } })));
 assert.equal(skyCondition({ rain_mm_h: 4, solar_factor: .95 }), "Rain");
 assert.equal(skyCondition({ rain_mm_h: 0, solar_factor: .72 }), "Partly cloudy");
+assert.deepEqual(replayContext(withReplayContext("?replay=1&at=38", { at: 4.125, policy: "push" })),
+  { at: 4.125, policy: "push" });
+assert.equal(withReplayContext("?trials=8&at=4&policy=steady", { at: 0 }), "?trials=8");
+assert.deepEqual(replayContext("?at=Infinity&policy=__proto__"), { at: 0, policy: undefined });
 
 // Capture only clipped paths, which belong to the rain layer.
 globalThis.window = { devicePixelRatio: 1 };
