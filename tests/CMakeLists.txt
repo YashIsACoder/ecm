@@ -18,3 +18,7 @@ add_executable(ecm_lab_test cpp/test_lab.cpp)
 target_link_libraries(ecm_lab_test PRIVATE ECM::lab)
 target_compile_definitions(ecm_lab_test PRIVATE TEST_ROUTE="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/route.csv")
 add_test(NAME ECM.Lab COMMAND ecm_lab_test)
+
+add_executable(ecm_atlas_test cpp/test_atlas.cpp)
+target_link_libraries(ecm_atlas_test PRIVATE ECM::lab)
+add_test(NAME ECM.Atlas COMMAND ecm_atlas_test)

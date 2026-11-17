@@ -1,5 +1,6 @@
 #include "ecm/lab.hpp"
 #include "ecm/forecast.hpp"
+#include "atlas_report.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -32,6 +33,7 @@ void help(std::ostream& output) {
         << "--bwsc-2025-timing adds next-day penalties after late planned stage arrivals.\n"
         << "--weather baseline|posterior selects the weather model.\n"
         << "--forecast-report emits calibration diagnostics as JSON and exits.\n"
+        << "--atlas-report emits a matched Cruiser fleet replay and solar ephemeris for the built-in route.\n"
         << "Defaults: built-in outback route, 2000 trials, seed 2025, reference vehicle and segment model.\n"
         << "Pacing: --steady-kmh N --push-kmh N --reserve-strategy tiers|envelope\n"
         << "        --reserve-fast-kmh N --reserve-medium-kmh N --reserve-slow-kmh N --reserve-target-pct N\n"
@@ -109,6 +111,7 @@ int main(int argc, char** argv) {
         bool race_schedule = false;
         bool bwsc_timing = false;
         bool describe_forecast = false;
+        bool describe_atlas = false;
         for (int i = 1; i < argc; ++i) {
             const std::string_view option = argv[i];
             if (option == "--help" || option == "-h") {
@@ -122,6 +125,10 @@ int main(int argc, char** argv) {
             }
             if (option == "--forecast-report") {
                 describe_forecast = true;
+                continue;
+            }
+            if (option == "--atlas-report") {
+                describe_atlas = true;
                 continue;
             }
             if (++i == argc) {
@@ -198,6 +205,14 @@ int main(int argc, char** argv) {
             throw std::invalid_argument("traced trial must be between 1 and the number of trials");
         }
 
+        if (describe_atlas) {
+            if (route_path) throw std::invalid_argument("--atlas-report uses the built-in outback route");
+            write_atlas_report(ecm::lab::default_route(), experiment, traced_trial.value_or(1),
+                               ecm::lab::route_energy_model(model, gust_sd_mps), std::cout);
+            if (!std::cout.flush()) throw std::runtime_error("failed to write atlas report");
+            return 0;
+        }
+        const auto route = route_path ? ecm::lab::read_route(*route_path) : ecm::lab::default_route();
         auto config = ecm::lab::vehicle_config(vehicle);
         config.energy_model = ecm::lab::route_energy_model(model, gust_sd_mps);
         config.capacity_wh = capacity.value_or(config.capacity_wh);
@@ -211,7 +226,6 @@ int main(int argc, char** argv) {
         config.array.system_efficiency = system_efficiency.value_or(config.array.system_efficiency);
         config.parked_clear_sky_wh_m2 = parked_exposure.value_or(config.parked_clear_sky_wh_m2);
         const bool cruiser = config.energy_rules == ecm::lab::EnergyRules::bwsc_2025_cruiser;
-        const auto route = route_path ? ecm::lab::read_route(*route_path) : ecm::lab::default_route();
         ecm::lab::TrialTrace trace;
         if (traced_trial) {
             std::cerr << "policy,leg,distance_km,speed_kmh,soc_pct,solar_factor,headwind_mps,rolling_factor,"

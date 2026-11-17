@@ -1,4 +1,4 @@
-add_executable(solar-race src/main.cpp)
+add_executable(solar-race src/main.cpp src/atlas_report.cpp)
 target_link_libraries(solar-race PRIVATE ECM::lab)
 set_target_properties(solar-race PROPERTIES
     CXX_EXTENSIONS OFF
